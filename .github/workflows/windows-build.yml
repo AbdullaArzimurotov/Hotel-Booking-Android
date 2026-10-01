@@ -33,6 +33,10 @@ jobs:
           java-version: '25'
       - name: Подготовить Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          # Старый пакет tools удалён из SDK; нужен только актуальный platform-tools.
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - name: Установить платформу API 36
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Проверить переносимость скриптов
