@@ -3,7 +3,11 @@ package ru.arzimurotov.hotel.domain
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-/** UI prototype data. No availability or booking can be inferred from this catalogue. */
+/**
+ * Снимок локального каталога второго этапа: страны, города, гостиницы и городские места. Связи
+ * выражены строковыми идентификаторами, а не ссылками на Compose или SQL-сущности. Данные
+ * предназначены для проверки интерфейса; наличие номеров и бронь не подтверждаются.
+ */
 data class Catalog(
     val countries: List<Country>,
     val cities: List<City>,
@@ -17,10 +21,13 @@ data class Catalog(
     fun hotel(id: String) = hotels.find { it.id == id }
 }
 
+/** Страна задаёт валюту каталога; автоматический обмен валют пока не реализован. */
 data class Country(val id: String, val name: String, val currency: String)
 
+/** Город связан со страной через countryId; caption используется в карточке направления. */
 data class City(val id: String, val countryId: String, val name: String, val caption: String)
 
+/** Ключи трёх встроенных изображений. UI преобразует их в drawable, сеть не требуется. */
 enum class Photo {
     EXTERIOR,
     ROOM,
@@ -43,8 +50,18 @@ enum class RoomKind(val title: String) {
     SUITE("Люкс"),
 }
 
+/**
+ * Предложение типа номера, не конкретный физический номер и не остаток доступных комнат. capacity —
+ * максимум гостей, area — площадь в м², pricePerNight — цена за номер/ночь в целых единицах валюты
+ * страны. Денежные расчёты прототипа используют Long, не Double.
+ */
 data class RoomOffer(val kind: RoomKind, val capacity: Int, val area: Int, val pricePerNight: Long)
 
+/**
+ * Дополнительная услуга предварительного расчёта. perNight=true означает начисление за каждую ночь
+ * на каждый номер (завтрак). perNight=false — один раз на весь расчёт (трансфер/поздний выезд).
+ * Выбор услуги не отправляет заказ внешней компании.
+ */
 data class HotelService(
     val id: String,
     val name: String,
@@ -53,6 +70,11 @@ data class HotelService(
     val description: String,
 )
 
+/**
+ * Вымышленная гостиница. Звёздность stars и демонстрационный рейтинг rating независимы. distanceKm
+ * — учебное расстояние до центра, а не вычисленный GPS-маршрут. Комнаты и услуги вложены в модель
+ * для прототипа; SQL-модель появится отдельно.
+ */
 data class Hotel(
     val id: String,
     val cityId: String,
@@ -79,6 +101,7 @@ enum class PlaceCategory(val title: String) {
     LEISURE("Отдых"),
 }
 
+/** Городской информационный объект. Билеты, брони столиков и платежи здесь отсутствуют. */
 data class Place(
     val id: String,
     val cityId: String,
@@ -96,6 +119,7 @@ enum class SortOrder(val title: String) {
     DISTANCE("Ближе к центру"),
 }
 
+/** Группы фильтров. Пустой набор означает отсутствие ограничения по этому признаку. */
 data class SearchFilters(
     val stars: Set<Int> = emptySet(),
     val minRating: Double = 0.0,
@@ -115,6 +139,11 @@ data class SearchFilters(
                 .count { it }
 }
 
+/**
+ * Единое неизменяемое состояние поисковой формы. Все изменения создают копию через copy.
+ * cityId=null выбирает все города одной страны. Диапазон дат — [checkIn, checkOut): день выезда не
+ * считается отдельной ночью. Даты не проверяют серверную занятость.
+ */
 data class SearchQuery(
     val countryId: String = "uz",
     val cityId: String? = "tashkent",
@@ -131,9 +160,10 @@ data class SearchQuery(
         get() = ChronoUnit.DAYS.between(checkIn, checkOut)
 
     val guestsPerRoom: Int
+        // Округление вверх: тип номера должен вмещать максимальную долю гостей в группе.
         get() = (adults + children + rooms - 1) / rooms.coerceAtLeast(1)
 
-    /** A single country is required, so prices never compare RUB, TRY and UZS numerically. */
+    /** Одна страна обязательна: цены в RUB, TRY и UZS не сравниваются без конвертации. */
     fun validationError(catalog: Catalog, today: LocalDate = LocalDate.now()): String? =
         when {
             catalog.countries.none { it.id == countryId } -> "Выберите страну."
@@ -151,11 +181,20 @@ data class SearchQuery(
         }
 }
 
+/**
+ * Контракт источника каталога для ViewModel. На этапе 2 реализован локальными данными. suspend
+ * позволяет впоследствии добавить REST без привязки экранов к HTTP-клиенту.
+ */
 interface CatalogRepository {
     suspend fun load(): Catalog
 }
 
-/** Local filtering for design verification, NOT server-side inventory search. */
+/**
+ * Выбирает гостиницы только из городов нужной страны, затем применяет все ограничения. Гостиница
+ * подходит, если существует хотя бы один тип номера нужной вместимости, категории и бюджета. Для
+ * равных значений сортировки id даёт стабильный порядок. Это локальная фильтрация для проверки UX,
+ * а не запрос свободных номеров по датам.
+ */
 fun Catalog.search(query: SearchQuery): List<Hotel> {
     val cityIds =
         cities
@@ -189,6 +228,11 @@ fun Catalog.search(query: SearchQuery): List<Hotel> {
     }
 }
 
+/**
+ * Цена подходящего типа номера для карточки/сортировки. Нельзя показывать дешёвый двухместный номер
+ * как подходящее предложение для трёх гостей. startingPrice — резервное отображение для общей
+ * карточки; функция сама не подтверждает доступность.
+ */
 fun Hotel.matchingPrice(query: SearchQuery): Long =
     rooms
         .filter {
@@ -198,7 +242,12 @@ fun Hotel.matchingPrice(query: SearchQuery): Long =
         }
         .minOfOrNull { it.pricePerNight } ?: startingPrice
 
-/** Preliminary display estimate, never used to create a booking or charge money. */
+/**
+ * Предварительная сумма = цена номера × ночи × номера + выбранные услуги. Посуточная услуга
+ * умножается на ночи и номера; разовая начисляется один раз. Вызов предполагает валидный
+ * SearchQuery. Налогов, конвертации и реального списания нет; окончательную сумму и доступность на
+ * следующих этапах будет определять сервер.
+ */
 fun previewTotal(room: RoomOffer, query: SearchQuery, services: List<HotelService>): Long =
     room.pricePerNight * query.nights * query.rooms +
         services.sumOf { it.price * if (it.perNight) query.nights * query.rooms else 1 }

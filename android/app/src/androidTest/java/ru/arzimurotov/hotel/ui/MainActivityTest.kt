@@ -6,7 +6,7 @@ import org.junit.Rule
 import org.junit.Test
 import ru.arzimurotov.hotel.MainActivity
 
-/** Integration of the Hilt ViewModel, Russian resources and actual activity saved navigation. */
+/** Интеграция Hilt ViewModel, русских ресурсов и восстановления навигации Activity. */
 class MainActivityTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 

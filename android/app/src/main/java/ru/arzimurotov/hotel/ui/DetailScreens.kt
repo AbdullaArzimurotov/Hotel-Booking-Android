@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.arzimurotov.hotel.domain.*
 
+/** Локальная HorizontalPager-галерея; тап передаёт индекс для полноэкранного просмотра. */
 @Composable
 fun PhotoGallery(hotel: Hotel, onFull: (Int) -> Unit) {
     val pager = rememberPagerState(pageCount = { hotel.photos.size })
@@ -49,6 +50,12 @@ fun PhotoGallery(hotel: Hotel, onFull: (Int) -> Unit) {
     }
 }
 
+/**
+ * Описание гостиницы, удобства, типы номеров, услуги и места этого города. Вместимость сравнивается
+ * с guestsPerRoom; неподходящий тип нельзя выбрать для расчёта. Удобства — информационные метки, а
+ * не неработающие кнопки. onQuote открывает расчёт, не создаёт бронь; весь бизнес-заказ будет
+ * подтверждаться сервером позднее.
+ */
 @Composable
 fun HotelDetailScreen(
     catalog: Catalog,
@@ -224,6 +231,7 @@ fun HotelDetailScreen(
     }
 }
 
+/** Полноэкранные оригинальные иллюстрации с ContentScale.Fit, без обрезки изображения. */
 @Composable
 fun GalleryScreen(hotel: Hotel, initialPage: Int, onBack: () -> Unit) {
     val pager =
@@ -275,6 +283,12 @@ fun GalleryScreen(hotel: Hotel, initialPage: Int, onBack: () -> Unit) {
     }
 }
 
+/**
+ * Предварительный расчёт выбранного типа номера и дополнительных услуг. Выбранные id сопоставляются
+ * со списком hotel.services, сумма считает previewTotal. Подтверждение показывает объяснение
+ * будущего процесса, а не поддельную успешную бронь. Нет платёжных реквизитов, вызова booking API
+ * или записи заказа в SQL.
+ */
 @Composable
 fun QuoteScreen(
     catalog: Catalog,
@@ -398,6 +412,7 @@ fun QuoteScreen(
         )
 }
 
+/** Описание вымышленного места; не выдаёт билет и не обещает реальную услугу. */
 @Composable
 fun PlaceDetailScreen(place: Place, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().testTag("place_detail")) {

@@ -9,7 +9,7 @@ import org.junit.Test
 import ru.arzimurotov.hotel.data.DemoCatalogRepository
 import ru.arzimurotov.hotel.domain.*
 
-/** Real Compose navigation, no network dependency or fabricated bookings. */
+/** Проверка навигации Compose без зависимости от сети и вымышленных бронирований. */
 class HotelAppTest {
     @get:Rule val compose = createComposeRule()
     private var latest =

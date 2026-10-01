@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Local development commands. Never reads or modifies the user's existing PG cluster."""
+"""Локальный запуск на macOS и Windows без изменения существующих баз PostgreSQL."""
 import argparse
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import socket
 import subprocess
@@ -17,8 +18,36 @@ LOCAL = ROOT / ".local"
 DATA = LOCAL / "postgres"
 CONFIG = LOCAL / "credentials.json"
 PORT = 55432
-PG_BIN = Path(os.environ.get("HOTEL_PG_BIN", "/Applications/Postgres.app/Contents/Versions/18/bin"))
-JBR = Path("/Applications/Android Studio.app/Contents/jbr/Contents/Home")
+WINDOWS = sys.platform == "win32"
+
+
+def postgres_bin():
+    """Путь задаётся локально; каталог SDK и пути другого компьютера не копируются."""
+    if os.environ.get("HOTEL_PG_BIN"):
+        return Path(os.environ["HOTEL_PG_BIN"])
+    if WINDOWS:
+        return Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "PostgreSQL/18/bin"
+    return Path("/Applications/Postgres.app/Contents/Versions/18/bin")
+
+
+def java_home():
+    if os.environ.get("JAVA_HOME"):
+        return Path(os.environ["JAVA_HOME"])
+    if WINDOWS:
+        return Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Android/Android Studio/jbr"
+    return Path("/Applications/Android Studio.app/Contents/jbr/Contents/Home")
+
+
+def pg_tool(name):
+    return postgres_bin() / (name + (".exe" if WINDOWS else ""))
+
+
+def postgres_options():
+    # В Windows нет Unix-сокетов. TCP ограничен локальным адресом на обеих ОС.
+    options = f"-h 127.0.0.1 -p {PORT} -c max_connections=20 -c shared_buffers=64MB"
+    if not WINDOWS:
+        options += f' -k "{LOCAL}"'
+    return options
 
 
 def run(args, **kwargs):
@@ -26,11 +55,17 @@ def run(args, **kwargs):
 
 
 def credentials():
+    """Создаёт приватные пароли только для нового кластера; чужой конфиг отклоняется."""
     LOCAL.mkdir(mode=0o700, exist_ok=True)
     if CONFIG.exists():
         result = json.loads(CONFIG.read_text())
         if result.get("project") != "HotelCoursework" or result.get("port") != PORT:
             raise RuntimeError("Unexpected local credentials file; refusing to change a cluster")
+        # В SQL ниже подставляются только автоматически сгенерированные hex-значения.
+        for key in ("admin_password", "app_password"):
+            value = result.get(key)
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{48}", value):
+                raise RuntimeError("Invalid local credential format; no database was changed")
         return result
     if DATA.exists():
         raise RuntimeError("Database directory exists without credentials; refusing to overwrite it")
@@ -43,10 +78,11 @@ def credentials():
 
 
 def psql(sql, config, database="postgres"):
-    environment = dict(os.environ, PGPASSWORD=config["admin_password"])
-    return run([PG_BIN / "psql", "-h", "127.0.0.1", "-p", PORT,
+    """Передаёт SQL через stdin, пароль через окружение, а не через командную строку."""
+    environment = dict(os.environ, PGPASSWORD=config["admin_password"], PGCLIENTENCODING="UTF8")
+    return run([pg_tool("psql"), "-h", "127.0.0.1", "-p", PORT,
                 "-U", "hotel_admin", "-d", database, "-v", "ON_ERROR_STOP=1", "-At"],
-               input=sql, text=True, capture_output=True, env=environment).stdout.strip()
+               input=sql, text=True, encoding="utf-8", capture_output=True, env=environment).stdout.strip()
 
 
 def port_available():
@@ -59,8 +95,9 @@ def port_available():
 
 
 def start_db():
-    if not (PG_BIN / "initdb").is_file():
-        raise RuntimeError("Postgres.app 18 binaries not found; set HOTEL_PG_BIN")
+    """Инициализирует только .local/postgres, проверяет владельца порта и создаёт роль/базу."""
+    if not pg_tool("initdb").is_file():
+        raise RuntimeError("PostgreSQL 18 binaries not found; set HOTEL_PG_BIN (see docs/WINDOWS.md)")
     config = credentials()
     if not (DATA / "PG_VERSION").exists():
         if not port_available():
@@ -69,21 +106,21 @@ def start_db():
         try:
             with os.fdopen(descriptor, "w") as stream:
                 stream.write(config["admin_password"] + "\n")
-            run([PG_BIN / "initdb", "-D", DATA, "-U", "hotel_admin", "--encoding=UTF8",
+            run([pg_tool("initdb"), "-D", DATA, "-U", "hotel_admin", "--encoding=UTF8",
                  "--locale=C", "--auth-local=scram-sha-256", "--auth-host=scram-sha-256", "--pwfile", name])
         finally:
             Path(name).unlink(missing_ok=True)
-    status = subprocess.run([str(PG_BIN / "pg_ctl"), "-D", str(DATA), "status"], capture_output=True)
+    status = subprocess.run([str(pg_tool("pg_ctl")), "-D", str(DATA), "status"], capture_output=True)
     if status.returncode:
         if not port_available():
             raise RuntimeError("Port 55432 is occupied; no existing process was stopped")
-        run([PG_BIN / "pg_ctl", "-D", DATA, "-l", LOCAL / "postgres.log", "-w",
-             "-o", f"-h 127.0.0.1 -p {PORT} -k /tmp -c max_connections=20 -c shared_buffers=64MB", "start"])
+        run([pg_tool("pg_ctl"), "-D", DATA, "-l", LOCAL / "postgres.log", "-w",
+             "-o", postgres_options(), "start"])
     actual = psql("SHOW data_directory;", config)
     if Path(actual).resolve() != DATA.resolve():
         raise RuntimeError("The port belongs to a different database cluster")
     if not psql("SELECT 1 FROM pg_roles WHERE rolname='hotel_app';", config):
-        password = config["app_password"]  # generated hex, never interpolated from user input
+        password = config["app_password"]  # Проверенное hex-значение, а не пользовательский SQL.
         psql(f"CREATE ROLE hotel_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '{password}';", config)
     if not psql("SELECT 1 FROM pg_database WHERE datname='hotel_coursework';", config):
         psql("CREATE DATABASE hotel_coursework OWNER hotel_app;", config)
@@ -91,13 +128,23 @@ def start_db():
 
 
 def server():
+    """Запускает свой PostgreSQL, собирает Ktor и передаёт локальные настройки процессу JVM."""
     start_db()
     config = credentials()
     environment = dict(os.environ, DB_URL=f"jdbc:postgresql://127.0.0.1:{PORT}/hotel_coursework",
                        DB_USER="hotel_app", DB_PASSWORD=config["app_password"], HOST="127.0.0.1", PORT="8080")
-    if JBR.is_dir():
-        environment["JAVA_HOME"] = str(JBR)
-    # Compile first, then run the distribution directly: no Gradle daemon stays in RAM.
+    jbr = java_home()
+    if not (jbr / "bin" / ("java.exe" if WINDOWS else "java")).is_file():
+        raise RuntimeError("Java not found; set JAVA_HOME to Android Studio jbr (see README.md)")
+    environment["JAVA_HOME"] = str(jbr)
+    # Сначала собираем дистрибутив: постоянный Gradle daemon не занимает память.
+    if WINDOWS:
+        # Относительное имя .bat и cwd избегают проблем cmd.exe с пробелами в пути.
+        command = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c"]
+        run(command + ["gradlew.bat", "--no-daemon", "installDist"], cwd=ROOT / "server", env=environment)
+        binary_dir = ROOT / "server/build/install/HotelCourseworkServer/bin"
+        run(command + ["HotelCourseworkServer.bat"], cwd=binary_dir, env=environment)
+        return
     run([ROOT / "server/gradlew", "--no-daemon", "installDist"], cwd=ROOT / "server", env=environment)
     executable = ROOT / "server/build/install/HotelCourseworkServer/bin/HotelCourseworkServer"
     os.chdir(ROOT / "server")
@@ -105,6 +152,7 @@ def server():
 
 
 def smoke():
+    """Проверяет HTTP-сервер и реальную готовность базы, не имитирует успешный ответ."""
     for path in ("/health", "/api/v1/health"):
         with urllib.request.urlopen("http://127.0.0.1:8080" + path, timeout=8) as response:
             body = json.load(response)
@@ -115,10 +163,11 @@ def smoke():
 
 
 def stop_db():
+    """Останавливает кластер по точному DATA-пути; данные и Windows-службы не удаляются."""
     if not CONFIG.exists() or not (DATA / "PG_VERSION").exists():
         print("Project database has not been initialized")
         return
-    run([PG_BIN / "pg_ctl", "-D", DATA, "-m", "fast", "-w", "stop"])
+    run([pg_tool("pg_ctl"), "-D", DATA, "-m", "fast", "-w", "stop"])
 
 
 def main():
@@ -128,7 +177,7 @@ def main():
     try:
         {"start-db": start_db, "stop-db": stop_db, "server": server, "smoke": smoke}[command]()
     except (RuntimeError, OSError, subprocess.CalledProcessError, urllib.error.URLError) as error:
-        # Do not print child-process input, environment, or credentials.
+        # Не выводим stdin дочернего процесса, переменные окружения и пароли.
         print("Development command failed:", str(error), file=sys.stderr)
         return 1
     return 0

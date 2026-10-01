@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ru.arzimurotov.hotel.domain.*
 
+/** Состояние каталога для Compose: данные, загрузка/ошибка, форма и id избранных гостиниц. */
 data class BrowseState(
     val catalog: Catalog? = null,
     val loading: Boolean = true,
@@ -22,7 +23,13 @@ data class BrowseState(
     val favorites: Set<String> = emptySet(),
 )
 
-/** Form and favorites survive recreation; no user account or SQL persistence is claimed. */
+/**
+ * ViewModel каталога в MVVM: загружает CatalogRepository и обрабатывает действия UI.
+ * MutableStateFlow закрыт внутри класса; экран получает только поток для чтения. SavedStateHandle
+ * сохраняет параметры формы и избранное для восстановления Activity. Это не долговременная база
+ * аккаунта: очистка данных приложения сбросит состояние. Поиск/расчёт остаются доменными функциями,
+ * а не HTTP/SQL-логикой экранов.
+ */
 @HiltViewModel
 class BrowseViewModel
 @Inject
@@ -42,6 +49,7 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
         reload()
     }
 
+    /** Повторная загрузка после ошибки; параллельные одинаковые запросы не запускаются. */
     fun reload() {
         if (loadJob?.isActive == true) return
         loadJob =
@@ -58,6 +66,7 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
                         )
                     }
                 } catch (cancelled: CancellationException) {
+                    // Отмена жизненного цикла не является ошибкой каталога.
                     throw cancelled
                 } catch (_: Exception) {
                     mutableState.update { it.copy(loading = false, error = true) }
@@ -65,6 +74,10 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
             }
     }
 
+    /**
+     * Обновляет форму и сохраняет только совместимые с Bundle значения: примитивы и списки.
+     * LocalDate записывается числом epochDay, enum — именем; объекты UI в state не хранятся.
+     */
     fun setQuery(query: SearchQuery) {
         mutableState.update { it.copy(query = query) }
         saved["country"] = query.countryId
@@ -83,6 +96,7 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
         saved["name"] = query.name
     }
 
+    /** Переключает только существующий объект: неизвестный id не попадёт в избранное. */
     fun toggleFavorite(id: String) {
         if (state.value.catalog?.hotel(id) == null) return
         mutableState.update {
@@ -91,6 +105,7 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
         saved["favorites"] = ArrayList(state.value.favorites)
     }
 
+    /** Старые даты сбрасываются на будущие; неизвестные enum игнорируются безопасно. */
     private fun restoreQuery(): SearchQuery {
         val defaults = SearchQuery()
         val start = saved.get<Long>("in")?.let(LocalDate::ofEpochDay) ?: defaults.checkIn

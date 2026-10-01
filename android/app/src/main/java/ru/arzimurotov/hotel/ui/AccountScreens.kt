@@ -15,6 +15,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.arzimurotov.hotel.BuildConfig
 
+/**
+ * Честное пустое состояние будущего списка заказов. Демо-«успешные брони» не создаются.
+ * Единственное действие возвращает к поиску; SQL-история будет подключена на этапе 6.
+ */
 @Composable
 fun BookingsScreen(onSearch: () -> Unit) {
     Column(Modifier.fillMaxSize().testTag("bookings_screen")) {
@@ -38,6 +42,10 @@ fun BookingsScreen(onSearch: () -> Unit) {
     }
 }
 
+/**
+ * Гостевой профиль: число избранных, переходы к каталогу и диагностике, сведения о проекте.
+ * Вход/регистрация пока не реализованы: информационный диалог не выдаёт гостю фиктивный аккаунт.
+ */
 @Composable
 fun ProfileScreen(favorites: Int, onFavorites: () -> Unit, onDiagnostics: () -> Unit) {
     var information by rememberSaveable { mutableStateOf<String?>(null) }

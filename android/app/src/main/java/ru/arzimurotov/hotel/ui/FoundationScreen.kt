@@ -42,7 +42,7 @@ fun HotelTheme(content: @Composable () -> Unit) {
     )
 }
 
-/** Stage-one diagnostic UI. No reservation action is presented as implemented. */
+/** Диагностика платформы первого этапа. Бронирование не имитируется. */
 @Composable
 fun FoundationScreen(state: FoundationState, onRefresh: () -> Unit) {
     Surface(

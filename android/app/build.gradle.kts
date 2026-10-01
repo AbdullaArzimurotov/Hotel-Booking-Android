@@ -31,7 +31,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true; buildConfig = true }
-    // The product is Russian-only, including Material calendar resources.
+    // Приложение русскоязычное; ресурсы календаря Material не выделяются по языкам.
     bundle { language { enableSplit = false } }
     testOptions { unitTests.isReturnDefaultValues = true }
 }

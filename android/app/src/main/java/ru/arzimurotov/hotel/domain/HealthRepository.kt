@@ -1,9 +1,13 @@
 package ru.arzimurotov.hotel.domain
 
-/** Public, non-sensitive readiness information returned by our server. */
-data class SystemHealth(val serverConnected: Boolean, val databaseConnected: Boolean, val version: String)
+/** Общедоступные сведения о готовности сервера без конфиденциальных данных. */
+data class SystemHealth(
+    val serverConnected: Boolean,
+    val databaseConnected: Boolean,
+    val version: String,
+)
 
-/** Checks the real server, not cached catalogue data. */
+/** Проверяет реальный сервер, а не сохранённый каталог. */
 interface HealthRepository {
     suspend fun check(): SystemHealth
 }

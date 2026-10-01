@@ -53,6 +53,7 @@ fun plural(n: Long, one: String, few: String, many: String): String =
 fun guestLabel(q: SearchQuery) =
     "${plural((q.adults + q.children).toLong(), "гость", "гостя", "гостей")} · ${plural(q.rooms.toLong(), "номер", "номера", "номеров")}"
 
+/** Форматирование целых денежных единиц на русском; валюты не конвертируются. */
 fun money(value: Long, currency: String) =
     NumberFormat.getIntegerInstance(Russian).format(value) +
         " " +
@@ -82,7 +83,7 @@ enum class Glyph {
     CHEVRON,
 }
 
-/** Original line icons, independent of an external icon font or network service. */
+/** Собственные линейные иконки без внешнего иконочного шрифта или сетевого сервиса. */
 @Composable
 fun TravelIcon(
     icon: Glyph,
@@ -222,6 +223,7 @@ fun TravelIcon(
     }
 }
 
+/** Выбирает встроенный drawable по доменному Photo: HTTP-изображений в прототипе нет. */
 @Composable
 fun TravelPhoto(
     photo: Photo,
@@ -343,6 +345,10 @@ fun FavoriteButton(selected: Boolean, id: String, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Общая карточка поиска/рекомендаций/избранного. Звёзды, рейтинг и валюта разделены. При наличии
+ * query отображает цену подходящего номера; сердечко — отдельное действие.
+ */
 @Composable
 fun HotelCard(
     hotel: Hotel,
@@ -434,6 +440,7 @@ fun HotelCard(
     }
 }
 
+/** Переиспользуемое пустое/ошибочное состояние с необязательным действием восстановления. */
 @Composable
 fun EmptyPanel(
     title: String,

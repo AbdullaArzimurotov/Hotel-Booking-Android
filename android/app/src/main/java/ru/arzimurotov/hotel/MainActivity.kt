@@ -14,13 +14,19 @@ import ru.arzimurotov.hotel.ui.FoundationViewModel
 import ru.arzimurotov.hotel.ui.HotelApp
 import ru.arzimurotov.hotel.ui.HotelTheme
 
+/**
+ * Единственная launcher Activity. Hilt создаёт две независимые ViewModel: BrowseViewModel для
+ * локального каталога и FoundationViewModel для диагностики API. Подписка
+ * collectAsStateWithLifecycle связывает StateFlow с жизненным циклом Activity; HotelApp получает
+ * состояния и callbacks, не создаёт репозитории внутри composable.
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel: FoundationViewModel by viewModels()
     private val browseViewModel: BrowseViewModel by viewModels()
 
     override fun attachBaseContext(newBase: android.content.Context) {
-        // The agreed product language is Russian, including framework date-picker strings.
+        // Русский язык используется также в системных строках календаря Material.
         val locale = java.util.Locale.forLanguageTag("ru-RU")
         java.util.Locale.setDefault(locale)
         val configuration = android.content.res.Configuration(newBase.resources.configuration)

@@ -4,12 +4,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import ru.arzimurotov.hotel.domain.*
 
-/** Thirty-six fictional hotels, with offline illustrations. Replaced by REST data in stages 3–4. */
+/**
+ * Локальная реализация CatalogRepository для второго этапа, без сети и SQL. Создаёт
+ * детерминированные 36 гостиниц: 6 городов × 6 объектов, по два на 3/4/5 звёзд. 30 мест = 6 городов
+ * × 5 категорий. Страны/города реальные; названия объектов, адреса, рейтинги, цены и сведения об
+ * услугах вымышлены. Стабильные id позволяют восстанавливать навигацию и избранное; каталог не
+ * является SQL seed. В этапах 3–4 его заменит REST-источник с серверной проверкой данных.
+ */
 @Singleton
 class DemoCatalogRepository @Inject constructor() : CatalogRepository {
     override suspend fun load(): Catalog = createCatalog()
 
     companion object {
+        /** Чистая фабрика также используется unit/UI-тестами без DI и Android Activity. */
         fun createCatalog(): Catalog {
             val countries =
                 listOf(
@@ -49,6 +56,7 @@ class DemoCatalogRepository @Inject constructor() : CatalogRepository {
                 cities.flatMapIndexed { cityIndex, city ->
                     (0..5).map { index ->
                         val stars = 3 + index / 2
+                        // Цены каждой страны заданы в своей валюте; курс обмена не моделируется.
                         val base =
                             when (city.countryId) {
                                 "uz" -> 450_000L
@@ -112,6 +120,7 @@ class DemoCatalogRepository @Inject constructor() : CatalogRepository {
                     }
                 }
             val places =
+                // Городские места не дублируются для каждой гостиницы и не продают билеты.
                 cities.flatMap { city ->
                     PlaceCategory.entries.mapIndexed { i, category ->
                         val names =

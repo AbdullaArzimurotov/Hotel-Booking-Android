@@ -16,3 +16,15 @@ __pycache__/
 *.hprof
 captures/
 docs/screenshots/*.png
+# Локальный выбор JVM в Android Studio; каждый компьютер использует свой JBR.
+**/gradle/gradle-daemon-jvm.properties
+*.log
+.externalNativeBuild/
+.cxx/
+*.aab
+*.apk
+output-metadata.json
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+google-services.json

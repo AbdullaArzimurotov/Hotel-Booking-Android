@@ -25,7 +25,14 @@ private val tabs =
         AppTab("profile", "Профиль", Glyph.PROFILE),
     )
 
-/** Stage-two shell. All navigation is local; the diagnostic alone calls the live API. */
+/**
+ * Корневой composable и граф Navigation Compose для четырёх вкладок и вложенных экранов. Состояние
+ * приходит из Activity, события уходят callbacks в ViewModel (однонаправленный поток).
+ * Загрузка/ошибка обрабатываются до создания графа. Параметры маршрутов — стабильные id, а не
+ * сериализованные Hotel: объект повторно находится в актуальном Catalog. От 720 dp используется
+ * NavigationRail; на телефоне — нижняя панель главных вкладок. Диагностика — единственный экран,
+ * связанный с настоящим API на текущем этапе.
+ */
 @Composable
 fun HotelApp(
     state: BrowseState,
@@ -77,6 +84,8 @@ fun HotelApp(
                     }
                 val showBottom = tabs.any { it.route == route }
                 fun tab(routeName: String) {
+                    // Не накапливаем одинаковые вкладки в стеке; возвращаем их сохранённое
+                    // состояние.
                     nav.navigate(routeName) {
                         popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                         launchSingleTop = true
@@ -86,7 +95,9 @@ fun HotelApp(
                 fun hotel(id: String) {
                     val h = catalog.hotel(id) ?: return
                     val city = catalog.city(h.cityId)
-                    if (city.id != state.query.cityId)
+                    // Карточка из избранного/рекомендаций может быть из другой страны:
+                    // сбрасываем несовместимые фильтры, прежде чем считать цену в её валюте.
+                    if (city.id != state.query.cityId) {
                         onQuery(
                             state.query.copy(
                                 countryId = city.countryId,
@@ -95,6 +106,7 @@ fun HotelApp(
                                 name = "",
                             )
                         )
+                    }
                     nav.navigate("hotel/$id") { launchSingleTop = true }
                 }
                 fun back() {

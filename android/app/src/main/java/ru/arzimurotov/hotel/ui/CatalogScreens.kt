@@ -19,6 +19,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ru.arzimurotov.hotel.domain.*
 
+/**
+ * Общая форма главного экрана и результатов. Диалоги редактируют черновик, подтверждённые значения
+ * передаются через onQuery; поиск требует валидных дат/гостей. Сам компонент не обращается к HTTP и
+ * не хранит окончательные цены.
+ */
 @Composable
 fun SearchForm(
     catalog: Catalog,
@@ -168,6 +173,7 @@ private fun FormField(
     }
 }
 
+/** Главный экран: форма, быстрые направления и рекомендации из локального каталога. */
 @Composable
 fun SearchScreen(
     state: BrowseState,
@@ -309,6 +315,12 @@ fun SearchScreen(
     }
 }
 
+/**
+ * Результаты Catalog.search с поиском по имени, фильтрами и сортировкой. В режиме favoritesOnly
+ * показывает выбранные гостиницы независимо от страны: общей сортировки по смешанным валютам нет.
+ * wide включает двухколоночную сетку. Нулевой результат — отдельное состояние с возможностью сброса
+ * ограничений.
+ */
 @Composable
 fun ResultsScreen(
     state: BrowseState,
@@ -446,6 +458,10 @@ fun ResultsScreen(
         }
 }
 
+/**
+ * Информационный каталог мест: направление и категория ограничивают локальный список.
+ * Координаты/карта и продажа билетов в этом этапе отсутствуют; карточка открывает описание.
+ */
 @Composable
 fun PlacesScreen(
     catalog: Catalog,
@@ -512,6 +528,7 @@ fun PlacesScreen(
         }
 }
 
+/** Карточка городского места с явно условной иллюстрацией и переходом к деталям. */
 @Composable
 fun PlaceCard(place: Place, cityName: String, onClick: () -> Unit) {
     Card(

@@ -63,6 +63,10 @@ private fun FormDialog(
     }
 }
 
+/**
+ * Выбор страны, конкретного города или всех городов страны. Черновик направления не меняет общую
+ * форму до нажатия подтверждения.
+ */
 @Composable
 fun DestinationDialog(
     catalog: Catalog,
@@ -135,6 +139,10 @@ private object ColorTokens {
     val Selected = androidx.compose.ui.graphics.Color(0xFFEBF0F6)
 }
 
+/**
+ * Счётчики взрослых, детей и номеров. Проверяет ограничения SearchQuery, чтобы на каждый номер
+ * приходился взрослый и общая вместимость не превышалась.
+ */
 @Composable
 fun GuestsDialog(
     catalog: Catalog,
@@ -207,6 +215,11 @@ private fun CounterRow(
     }
 }
 
+/**
+ * Календарь диапазона на русском языке. Material хранит даты как миллисекунды UTC: преобразование
+ * через ZoneOffset.UTC предотвращает смещение на день из-за часового пояса. Нельзя подтвердить
+ * прошлую дату, пустой диапазон или проживание более 90 ночей.
+ */
 @Composable
 fun DatesDialog(query: SearchQuery, dismiss: () -> Unit, confirm: (SearchQuery) -> Unit) {
     val today = remember { LocalDate.now() }
@@ -317,6 +330,11 @@ fun DatesDialog(query: SearchQuery, dismiss: () -> Unit, confirm: (SearchQuery) 
     }
 }
 
+/**
+ * Черновики пяти групп фильтров сохраняются rememberSaveable при пересоздании UI. Бюджет вводится
+ * целым числом в валюте выбранной страны. «Применить» передаёт новый SearchFilters; закрытие без
+ * подтверждения не меняет исходный запрос.
+ */
 @Composable
 fun FiltersDialog(
     query: SearchQuery,
