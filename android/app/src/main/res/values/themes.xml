@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.Hotel" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#132F4C</item>
+        <item name="android:navigationBarColor">#F4F6F9</item>
+    </style>
+</resources>
