@@ -1,4 +1,4 @@
-# «Гостиница» — HotelCoursework
+# Hotel-Booking-Android — «Гостиница»
 
 Курсовая работа Арзимуротова А.М., ПИН-123. Android/Kotlin, Ktor, PostgreSQL.
 

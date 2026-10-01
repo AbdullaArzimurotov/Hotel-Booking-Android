@@ -1,3 +1,4 @@
+# Служебные файлы ОС и IDE.
 .DS_Store
 .idea/
 *.iml
@@ -19,6 +20,7 @@ docs/screenshots/*.png
 # Локальный выбор JVM в Android Studio; каждый компьютер использует свой JBR.
 **/gradle/gradle-daemon-jvm.properties
 *.log
+# Результаты нативной/Android-сборки не являются исходным кодом.
 .externalNativeBuild/
 .cxx/
 *.aab
