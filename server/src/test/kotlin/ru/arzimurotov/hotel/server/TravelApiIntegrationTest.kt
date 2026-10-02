@@ -41,7 +41,17 @@ class TravelApiIntegrationTest {
             assertTrue(search.search(q.copy(stars=setOf(hotel.stars),roomKind="STANDARD",maxDistanceKm=hotel.distanceKm,maxPrice=hotel.rooms.first {it.kind==RoomKind.STANDARD}.pricePerNight),0,20).items.any {it.hotelId==hotel.id})
             assertTrue(runCatching {search.search(q.copy(rooms=4,adults=2),0,20)}.isFailure)
             assertTrue(runCatching {search.search(q.copy(checkIn=q.checkOut),0,20)}.isFailure)
+            listOf(q.copy(checkIn=start.minusDays(100).toString()),
+                q.copy(checkOut=start.plusDays(91).toString()),q.copy(adults=0),q.copy(children=5),
+                q.copy(rooms=5),q.copy(roomKind="UNKNOWN"),q.copy(amenities=setOf("UNKNOWN"))).forEach {
+                assertTrue("Invalid search must fail: $it",runCatching {search.search(it,0,20)}.isFailure)
+            }
             val a=search.availability(hotel.id,q);val offer=a.offers.first {it.kind=="STANDARD"}
+            // Тариф должен покрывать и последнюю ночь. Частично действующий тариф
+            // не превращается в предложение за полный период.
+            db.query {c->c.execute("UPDATE rates SET valid_to=? WHERE id=?",Date.valueOf(start.plusDays(2)),uid(offer.rateId))}
+            assertTrue(search.availability(hotel.id,q).offers.none {it.kind=="STANDARD"})
+            db.query {c->c.execute("UPDATE rates SET valid_to=? WHERE id=?",Date.valueOf("2100-01-01"),uid(offer.rateId))}
             val transfer=a.services.first {it.code=="transfer"}
             val nightly=a.services.first {it.perNight}
             val selected=setOf(transfer.id,nightly.id)

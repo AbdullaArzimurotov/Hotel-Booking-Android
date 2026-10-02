@@ -47,6 +47,16 @@ class BookingIntegrationTest {
             val pdf=ReceiptService(service).download(user,paid.receiptId!!)
             assertTrue(pdf.size>1000)
             org.apache.pdfbox.Loader.loadPDF(pdf).use {doc->val text=org.apache.pdfbox.text.PDFTextStripper().getText(doc);assertTrue(text.contains(b.snapshot.hotelName));assertTrue(text.contains("Не является фискальным чеком"))}
+            // Вторая квитанция — только тестовый снимок, не новый платёж. Проверяем
+            // перенос длинных реквизитов, emoji вне шрифта и несколько страниц услуг.
+            val longSnapshot=paid.snapshot.copy(customer="Русское имя "+"ДлинныйТекст".repeat(35)+" 😀",
+                services=(1..70).map {BookedService("Учебная услуга номер $it: "+"Описание ".repeat(12),100)})
+            val longPdf=ReceiptService(service).render(paid.copy(snapshot=longSnapshot),clock.instant())
+            org.apache.pdfbox.Loader.loadPDF(longPdf).use {doc->
+                assertTrue(doc.numberOfPages>=3)
+                val text=org.apache.pdfbox.text.PDFTextStripper().getText(doc)
+                assertTrue(text.contains("Русское имя"));assertTrue(text.contains("услуга номер 70"))
+            }
             val cancelled=repo.cancel(user,b.id);assertEquals("REVERSED",cancelled.paymentStatus);assertEquals(cancelled.id,repo.cancel(user,b.id).id)
             assertEquals("PAID",repo.receipt(user,paid.receiptId!!).first.paymentStatus)
             assertEquals(4,search.availability(hotel.id,q).offers.first {it.kind=="STANDARD"}.availableCount)
@@ -55,6 +65,14 @@ class BookingIntegrationTest {
             assertTrue(runCatching {repo.pay(user,DemoPayment(pending.id,UUID.randomUUID().toString()))}.isFailure)
             assertEquals(4,search.availability(hotel.id,q).offers.first {it.kind=="STANDARD"}.availableCount)
             repo.maintenance();assertEquals("EXPIRED",repo.get(user,pending.id).cancellationReason)
+            val racingExpiry=repo.create(user,request());clock.now=clock.now.plusSeconds(901)
+            coroutineScope {
+                listOf(async {runCatching {repo.pay(user,DemoPayment(racingExpiry.id,UUID.randomUUID().toString()))}},
+                    async {runCatching {repo.cancel(user,racingExpiry.id)}},async {repo.maintenance()}).awaitAll()
+            }
+            assertEquals("CANCELLED",repo.get(user,racingExpiry.id).status)
+            assertEquals(0,db.query {c->c.select("SELECT count(*) FROM payments WHERE booking_id=?",uid(racingExpiry.id)) {it.getInt(1)}.single()})
+            assertEquals(4,search.availability(hotel.id,q).offers.first {it.kind=="STANDARD"}.availableCount)
             val atHotel=repo.create(user,request(payment="PAY_AT_HOTEL"));assertEquals("CONFIRMED",atHotel.status);assertEquals("UNPAID",atHotel.paymentStatus);assertNull(atHotel.receiptId)
             assertTrue(runCatching {repo.pay(user,DemoPayment(atHotel.id,UUID.randomUUID().toString()))}.isFailure)
             val adjacent=q.copy(checkIn=q.checkOut,checkOut=start.plusDays(5).toString())
