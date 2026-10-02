@@ -25,7 +25,7 @@
 | Android JVM | 29 тестов, 0 failures/errors; XML в app/build/test-results/testDebugUnitTest |
 | Backend с настоящим PostgreSQL | 15 тестов, 0 failures/errors/skipped; XML server/build/test-results/test |
 | Скрипты Mac/Windows | 10 unittest, все прошли |
-| Compose/Activity на AVD API 36 | Результат последнего прогона — .local/ui-tests-emulator-5554.log |
+| Compose/Activity на AVD API 36 | 24 теста прошли, включая два regression случая; .local/ui-tests-emulator-5554.log |
 | Debug / release сборки | assembleDebug/assembleRelease; release без облачного API использует hotel.invalid |
 | Lint | Нет ошибок; предупреждение о более новом Wrapper не требует незапланированной смены закреплённых версий |
 | Dokka | Android и server генерируют HTML-публикации build/dokka/html |
@@ -85,6 +85,9 @@ CONFIRMED/PAID; PDF сохранён через системный DocumentsUI �
 на телефоне и перенесены в историю; первый отображает REVERSED и сохраняет
 историческую квитанцию. Редактирование имени, выход и повторный вход проверены:
 SQL сохраняет профиль, приложение не подставляет чужие/фиктивные данные.
+После перезапуска Ktor и обновления APK оба заказа/профиль сохранились;
+история повторно загружена с API. Проверка нового заказа из восстановленной
+вкладки «История» показала автоматический переход в «Активные».
 
 На устройстве обнаружена и устранена ошибка PrintManager: русская локаль не должна
 подменять Activity baseContext через createConfigurationContext. Используется
