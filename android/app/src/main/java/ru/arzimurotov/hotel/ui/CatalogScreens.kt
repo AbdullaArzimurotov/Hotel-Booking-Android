@@ -185,7 +185,7 @@ fun SearchScreen(
 ) {
     val catalog = state.catalog ?: return
     val query = state.query
-    val hotels = catalog.search(query).take(4)
+    val hotels = catalog.hotels.filter {h->val city=catalog.city(h.cityId);city.countryId==query.countryId && (query.cityId==null || query.cityId==city.id)}.take(4)
     LazyVerticalGrid(
         GridCells.Fixed(if (wide) 2 else 1),
         modifier = Modifier.fillMaxSize().testTag("search_screen"),
@@ -241,6 +241,7 @@ fun SearchScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 DemoNote()
+                Text("Обзор каталога. Свободные номера и цены на даты проверяются после поиска.",style=MaterialTheme.typography.bodySmall)
                 SectionTitle("Откройте новый город", "Быстрый выбор направления")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     catalog.cities.forEach { city ->
@@ -279,7 +280,7 @@ fun SearchScreen(
                     hotel,
                     catalog.city(hotel.cityId),
                     catalog.country(query.countryId).currency,
-                    hotel.matchingPrice(query),
+                    hotel.startingPrice,
                     hotel.id in state.favorites,
                     { onHotel(hotel.id) },
                     { onFavorite(hotel.id) },
@@ -330,6 +331,9 @@ fun ResultsScreen(
     onHotel: (String) -> Unit,
     onFavorite: (String) -> Unit,
     favoritesOnly: Boolean = false,
+    server:TravelState? = null,
+    onMore:()->Unit = {},
+    onRetry:()->Unit = {},
 ) {
     val catalog = state.catalog ?: return
     val query = state.query
@@ -338,6 +342,7 @@ fun ResultsScreen(
     var sort by remember { mutableStateOf(false) }
     val hotels =
         if (favoritesOnly) catalog.hotels.filter { it.id in state.favorites }
+        else if(server!=null) server.search?.items.orEmpty().mapNotNull {catalog.hotel(it.hotelId)}
         else catalog.search(query)
     Column(
         Modifier.fillMaxSize().testTag(if (favoritesOnly) "favorites_screen" else "results_screen")
@@ -423,22 +428,33 @@ fun ResultsScreen(
                     DemoNote(
                         if (favoritesOnly)
                             "Избранное не синхронизируется с аккаунтом. Наличие и цены — демонстрационные."
+                        else if(server!=null) "Доступность проверена сервером. Бронирование ещё не создано."
                         else "Это подбор по учебному каталогу, а не список свободных номеров."
                     )
+                    if(server?.searching==true) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("server_search_loading"))
+                    if(server?.search!=null && !server.searching && server.searchError==null)
+                        Text("Найдено: ${server.search.total}",Modifier.testTag("server_search_success"),style=MaterialTheme.typography.bodySmall)
+                    server?.searchError?.let {Text(it,color=MaterialTheme.colorScheme.error);TextButton(onRetry) {Text("Повторить поиск")}}
                 }
             }
             items(hotels, key = { it.id }) { hotel ->
+                Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 HotelCard(
                     hotel,
                     catalog.city(hotel.cityId),
                     catalog.country(catalog.city(hotel.cityId).countryId).currency,
-                    if (favoritesOnly) hotel.startingPrice else hotel.matchingPrice(query),
+                    if (favoritesOnly) hotel.startingPrice else if(server!=null) server.search?.items?.find {it.hotelId==hotel.id}?.offers?.minOfOrNull {it.nightlyPrice} ?: 0 else hotel.matchingPrice(query),
                     hotel.id in state.favorites,
                     { onHotel(hotel.id) },
                     { onFavorite(hotel.id) },
                 )
+                if(server!=null && !favoritesOnly) server.search?.items?.find {it.hotelId==hotel.id}?.offers?.minByOrNull {it.stayTotal}?.let {o->
+                    Text("От ${money(o.stayTotal,o.currency)} за весь период · ${query.rooms} номер(а). Без дополнительных услуг.",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(horizontal=6.dp))
+                }
+                }
             }
-            if (hotels.isEmpty())
+            if(server!=null && !favoritesOnly && hotels.size<(server.search?.total ?: 0)) item(span={GridItemSpan(maxLineSpan)}) { TextButton(onMore,enabled=!server.searching,modifier=Modifier.fillMaxWidth()) {Text("Показать ещё")}}
+            if (hotels.isEmpty() && server?.searching!=true && server?.searchError==null)
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     EmptyPanel(
                         if (favoritesOnly) "Сохраните понравившиеся места" else "Ничего не найдено",

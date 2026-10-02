@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import getpass
 import urllib.error
 import urllib.request
 
@@ -46,7 +47,8 @@ def postgres_options():
     # В Windows нет Unix-сокетов. TCP ограничен локальным адресом на обеих ОС.
     options = f"-h 127.0.0.1 -p {PORT} -c max_connections=20 -c shared_buffers=64MB"
     if not WINDOWS:
-        options += f' -k "{LOCAL}"'
+        # Только TCP: длинный Unicode-путь курса превышает лимит Unix socket (103 байта).
+        options += ' -k ""'
     return options
 
 
@@ -127,7 +129,21 @@ def start_db():
     print("PostgreSQL ready: 127.0.0.1:55432/hotel_coursework (isolated project cluster)", flush=True)
 
 
-def server():
+def jwt_secret():
+    """Постоянный приватный ключ; смена перезапуска сервера не разлогинивает всех."""
+    LOCAL.mkdir(mode=0o700, exist_ok=True)
+    path = LOCAL / "jwt.secret"
+    if not path.exists():
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(descriptor, "w") as stream:
+            stream.write(secrets.token_hex(32))
+    value = path.read_text().strip()
+    if not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise RuntimeError("Invalid local JWT secret")
+    return value
+
+
+def server(admin=False):
     """Запускает свой PostgreSQL, собирает Ktor и передаёт локальные настройки процессу JVM."""
     start_db()
     config = credentials()
@@ -137,18 +153,55 @@ def server():
     if not (jbr / "bin" / ("java.exe" if WINDOWS else "java")).is_file():
         raise RuntimeError("Java not found; set JAVA_HOME to Android Studio jbr (see README.md)")
     environment["JAVA_HOME"] = str(jbr)
+    environment["JWT_SECRET"] = jwt_secret()
+    extra = []
+    if admin:
+        environment["ADMIN_EMAIL"] = input("Email администратора: ").strip()
+        environment["ADMIN_NAME"] = input("Имя администратора: ").strip()
+        password = getpass.getpass("Пароль (10–128 символов): ")
+        if password != getpass.getpass("Повторите пароль: "):
+            raise RuntimeError("Passwords do not match")
+        environment["ADMIN_PASSWORD"] = password
+        extra = ["create-admin"]
     # Сначала собираем дистрибутив: постоянный Gradle daemon не занимает память.
     if WINDOWS:
         # Относительное имя .bat и cwd избегают проблем cmd.exe с пробелами в пути.
         command = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c"]
         run(command + ["gradlew.bat", "--no-daemon", "installDist"], cwd=ROOT / "server", env=environment)
         binary_dir = ROOT / "server/build/install/HotelCourseworkServer/bin"
-        run(command + ["HotelCourseworkServer.bat"], cwd=binary_dir, env=environment)
+        run(command + ["HotelCourseworkServer.bat"] + extra, cwd=binary_dir, env=environment)
         return
     run([ROOT / "server/gradlew", "--no-daemon", "installDist"], cwd=ROOT / "server", env=environment)
     executable = ROOT / "server/build/install/HotelCourseworkServer/bin/HotelCourseworkServer"
     os.chdir(ROOT / "server")
-    os.execve(executable, [str(executable)], environment)
+    os.execve(executable, [str(executable)] + extra, environment)
+
+
+def usb():
+    """Reverse только для единственного подключённого телефона; чужие приложения не меняет."""
+    sdk = Path(os.environ.get("ANDROID_HOME", str(Path.home() / ("AppData/Local/Android/Sdk" if WINDOWS else "Library/Android/sdk"))))
+    adb = sdk / "platform-tools" / ("adb.exe" if WINDOWS else "adb")
+    result = run([adb, "devices"], capture_output=True, text=True).stdout
+    phones = [line.split()[0] for line in result.splitlines()[1:]
+              if len(line.split()) == 2 and line.split()[1] == "device" and not line.startswith("emulator-")]
+    if len(phones) != 1:
+        raise RuntimeError("Connect exactly one authorized USB phone")
+    run([adb, "-s", phones[0], "reverse", "tcp:8080", "tcp:8080"])
+    print("USB ready. In debug app choose USB: 127.0.0.1:8080")
+
+
+def test_sql():
+    """Создаёт отдельную тестовую БД. Основная не очищается; тестовая сохраняется для аудита."""
+    start_db()
+    config = credentials()
+    database = "hotel_coursework_test_" + secrets.token_hex(6)
+    psql(f"CREATE DATABASE {database} OWNER hotel_app;", config)
+    environment = dict(os.environ, JAVA_HOME=str(java_home()),
+                       HOTEL_TEST_DB_URL=f"jdbc:postgresql://127.0.0.1:{PORT}/{database}",
+                       HOTEL_TEST_DB_PASSWORD=config["app_password"])
+    command = ([os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", "gradlew.bat"] if WINDOWS else [ROOT / "server/gradlew"])
+    run(command + ["--no-daemon", "test", "--rerun-tasks"], cwd=ROOT / "server", env=environment)
+    print("SQL tests used separate database:", database, "(retained, no primary data removed)")
 
 
 def smoke():
@@ -172,10 +225,11 @@ def stop_db():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["start-db", "stop-db", "server", "smoke"])
+    parser.add_argument("command", choices=["start-db", "stop-db", "server", "smoke", "usb", "create-admin", "test-sql"])
     command = parser.parse_args().command
     try:
-        {"start-db": start_db, "stop-db": stop_db, "server": server, "smoke": smoke}[command]()
+        {"start-db": start_db, "stop-db": stop_db, "server": server, "smoke": smoke,
+         "usb": usb, "create-admin": lambda: server(admin=True), "test-sql": test_sql}[command]()
     except (RuntimeError, OSError, subprocess.CalledProcessError, urllib.error.URLError) as error:
         # Не выводим stdin дочернего процесса, переменные окружения и пароли.
         print("Development command failed:", str(error), file=sys.stderr)

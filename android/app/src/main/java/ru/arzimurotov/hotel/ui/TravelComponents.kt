@@ -55,7 +55,7 @@ fun guestLabel(q: SearchQuery) =
 
 /** Форматирование целых денежных единиц на русском; валюты не конвертируются. */
 fun money(value: Long, currency: String) =
-    NumberFormat.getIntegerInstance(Russian).format(value) +
+    NumberFormat.getNumberInstance(Russian).apply { maximumFractionDigits = 2 }.format(java.math.BigDecimal.valueOf(value, 2)) +
         " " +
         when (currency) {
             "RUB" -> "₽"
@@ -301,7 +301,7 @@ fun DemoNote(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable fun DemoNote() = DemoNote("Учебный каталог. Наличие номеров пока не проверяется.")
+@Composable fun DemoNote() = DemoNote("Учебный каталог. Наличие и итоговая цена проверяются сервером для выбранных дат.")
 
 @Composable
 fun SectionTitle(title: String, subtitle: String? = null) {

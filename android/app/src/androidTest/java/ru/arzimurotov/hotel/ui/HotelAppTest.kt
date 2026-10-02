@@ -199,7 +199,7 @@ class HotelAppTest {
         compose.runOnIdle {
             assertEquals(setOf(5), applied!!.filters.stars)
             assertEquals(9.0, applied!!.filters.minRating, 0.001)
-            assertEquals(2_000_000L, applied!!.filters.maxPrice)
+            assertEquals(200_000_000L, applied!!.filters.maxPrice)
         }
     }
 }

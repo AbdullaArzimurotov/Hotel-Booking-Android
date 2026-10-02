@@ -67,6 +67,10 @@ fun HotelDetailScreen(
     onGallery: (Int) -> Unit,
     onRoom: (RoomKind) -> Unit,
     onPlace: (String) -> Unit,
+    live:Boolean=false,
+    checking:Boolean=false,
+    availabilityError:String?=null,
+    onRetry:()->Unit={},
 ) {
     val currency = catalog.country(catalog.city(hotel.cityId).countryId).currency
     Column(Modifier.fillMaxSize().testTag("hotel_detail")) {
@@ -141,8 +145,12 @@ fun HotelDetailScreen(
                     )
                     SectionTitle("Номера", "${dateLabel(query)} · ${guestLabel(query)}")
                     DemoNote(
-                        "Выберите тип для предварительного расчёта. Наличие и бронирование будут проверяться сервером на следующем этапе."
+                        if(live) "Доступность на выбранные даты проверяется сервером. Заказ ещё не создан."
+                        else "Выберите тип для предварительного расчёта. Наличие и бронирование будут проверяться сервером на следующем этапе."
                     )
+                    if(checking) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    availabilityError?.let {Text(it,color=MaterialTheme.colorScheme.error);TextButton(onRetry) {Text("Повторить")}}
+                    if(live && !checking && hotel.rooms.isEmpty() && availabilityError==null) Text("На эти даты нет подходящих свободных номеров.")
                 }
             }
             items(hotel.rooms, key = { it.kind.name }) { room ->
@@ -186,7 +194,7 @@ fun HotelDetailScreen(
                                 modifier = Modifier.testTag("room_${room.kind.name}"),
                                 shape = RoundedCornerShape(10.dp),
                             ) {
-                                Text("Рассчитать")
+                                Text(if(live) "Выбрать и оформить" else "Рассчитать")
                             }
                             if (room.capacity < query.guestsPerRoom)
                                 Text(

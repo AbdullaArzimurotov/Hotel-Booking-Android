@@ -1,13 +1,15 @@
 package ru.arzimurotov.hotel.domain
 
+import kotlinx.serialization.Serializable
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /**
- * Снимок локального каталога второго этапа: страны, города, гостиницы и городские места. Связи
+ * Снимок каталога REST API третьего этапа: страны, города, гостиницы и городские места. Связи
  * выражены строковыми идентификаторами, а не ссылками на Compose или SQL-сущности. Данные
  * предназначены для проверки интерфейса; наличие номеров и бронь не подтверждаются.
  */
+@Serializable
 data class Catalog(
     val countries: List<Country>,
     val cities: List<City>,
@@ -22,10 +24,12 @@ data class Catalog(
 }
 
 /** Страна задаёт валюту каталога; автоматический обмен валют пока не реализован. */
-data class Country(val id: String, val name: String, val currency: String)
+@Serializable
+data class Country(val id: String, val name: String, val currency: String, val legacyId: String = id)
 
 /** Город связан со страной через countryId; caption используется в карточке направления. */
-data class City(val id: String, val countryId: String, val name: String, val caption: String)
+@Serializable
+data class City(val id: String, val countryId: String, val name: String, val caption: String, val legacyId: String = id)
 
 /** Ключи трёх встроенных изображений. UI преобразует их в drawable, сеть не требуется. */
 enum class Photo {
@@ -52,9 +56,10 @@ enum class RoomKind(val title: String) {
 
 /**
  * Предложение типа номера, не конкретный физический номер и не остаток доступных комнат. capacity —
- * максимум гостей, area — площадь в м², pricePerNight — цена за номер/ночь в целых единицах валюты
+ * максимум гостей, area — площадь в м², pricePerNight — цена за номер/ночь в минимальных единицах валюты (копейках/тийинах/курушах)
  * страны. Денежные расчёты прототипа используют Long, не Double.
  */
+@Serializable
 data class RoomOffer(val kind: RoomKind, val capacity: Int, val area: Int, val pricePerNight: Long)
 
 /**
@@ -62,19 +67,22 @@ data class RoomOffer(val kind: RoomKind, val capacity: Int, val area: Int, val p
  * на каждый номер (завтрак). perNight=false — один раз на весь расчёт (трансфер/поздний выезд).
  * Выбор услуги не отправляет заказ внешней компании.
  */
+@Serializable
 data class HotelService(
     val id: String,
     val name: String,
     val price: Long,
     val perNight: Boolean,
     val description: String,
+    val code:String = id,
 )
 
 /**
  * Вымышленная гостиница. Звёздность stars и демонстрационный рейтинг rating независимы. distanceKm
  * — учебное расстояние до центра, а не вычисленный GPS-маршрут. Комнаты и услуги вложены в модель
- * для прототипа; SQL-модель появится отдельно.
+ * для прототипа; SQL-модель хранится на сервере; UI получает только DTO.
  */
+@Serializable
 data class Hotel(
     val id: String,
     val cityId: String,
@@ -88,6 +96,7 @@ data class Hotel(
     val rooms: List<RoomOffer>,
     val services: List<HotelService>,
     val photos: List<Photo>,
+    val legacyId: String = id,
 ) {
     val startingPrice: Long
         get() = rooms.minOf { it.pricePerNight }
@@ -102,6 +111,7 @@ enum class PlaceCategory(val title: String) {
 }
 
 /** Городской информационный объект. Билеты, брони столиков и платежи здесь отсутствуют. */
+@Serializable
 data class Place(
     val id: String,
     val cityId: String,
@@ -110,6 +120,7 @@ data class Place(
     val description: String,
     val address: String,
     val photo: Photo,
+    val legacyId: String = id,
 )
 
 enum class SortOrder(val title: String) {
@@ -126,6 +137,7 @@ data class SearchFilters(
     val maxPrice: Long? = null,
     val amenities: Set<Amenity> = emptySet(),
     val roomKind: RoomKind? = null,
+    val maxDistanceKm: Double? = null,
 ) {
     val activeCount
         get() =
@@ -135,6 +147,7 @@ data class SearchFilters(
                     maxPrice != null,
                     amenities.isNotEmpty(),
                     roomKind != null,
+                    maxDistanceKm != null,
                 )
                 .count { it }
 }

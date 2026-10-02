@@ -13,8 +13,8 @@ android {
         applicationId = "ru.arzimurotov.hotel"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 6
+        versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -31,6 +31,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true; buildConfig = true }
+    sourceSets.named("main") { kotlin.srcDir("../../shared/src/main/kotlin") }
     // Приложение русскоязычное; ресурсы календаря Material не выделяются по языкам.
     bundle { language { enableSplit = false } }
     testOptions { unitTests.isReturnDefaultValues = true }
@@ -60,6 +61,7 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.runner)
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 }

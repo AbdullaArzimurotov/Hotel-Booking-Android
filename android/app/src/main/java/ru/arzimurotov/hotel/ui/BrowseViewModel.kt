@@ -57,21 +57,36 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
                 mutableState.update { it.copy(loading = true, error = false) }
                 try {
                     val catalog = repository.load()
+                    val current=state.value.query
+                    val country=catalog.countries.find { it.id==current.countryId || it.legacyId==current.countryId } ?: catalog.countries.first()
+                    val city=current.cityId?.let { key -> catalog.cities.find { (it.id==key || it.legacyId==key) && it.countryId==country.id } ?: catalog.cities.firstOrNull { it.countryId==country.id } }
+                    val favorites=state.value.favorites.mapNotNull { key -> catalog.hotels.find { it.id==key || it.legacyId==key }?.id }.toSet()
+                    setQuery(current.copy(countryId=country.id,cityId=city?.id))
+                    saved["favorites"]=ArrayList(favorites)
                     mutableState.update {
                         it.copy(
                             catalog = catalog,
                             loading = false,
-                            favorites =
-                                it.favorites.intersect(catalog.hotels.map { h -> h.id }.toSet()),
+                            favorites = favorites,
                         )
                     }
                 } catch (cancelled: CancellationException) {
                     // Отмена жизненного цикла не является ошибкой каталога.
                     throw cancelled
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    // В debug журнале только тип ошибки: URL, SQL и персональные данные не выводятся.
+                    if(ru.arzimurotov.hotel.BuildConfig.DEBUG) android.util.Log.w("HotelCatalog",error.javaClass.simpleName)
                     mutableState.update { it.copy(loading = false, error = true) }
                 }
             }
+    }
+
+    /** Новый backend не должен получать данные/ответы предыдущего источника. */
+    fun changeSource() {
+        loadJob?.cancel()
+        loadJob=null
+        mutableState.update { it.copy(catalog=null,loading=true,error=false) }
+        reload()
     }
 
     /**
@@ -90,8 +105,10 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
         saved["stars"] = ArrayList(query.filters.stars)
         saved["rating"] = query.filters.minRating
         saved["price"] = query.filters.maxPrice
+        saved["moneyVersion"] = 1
         saved["amenities"] = ArrayList(query.filters.amenities.map { it.name })
         saved["roomKind"] = query.filters.roomKind?.name
+        saved["distance"] = query.filters.maxDistanceKm
         saved["sort"] = query.sort.name
         saved["name"] = query.name
     }
@@ -123,13 +140,14 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
                 SearchFilters(
                     saved.get<ArrayList<Int>>("stars")?.toSet().orEmpty(),
                     saved["rating"] ?: 0.0,
-                    saved["price"],
+                    saved.get<Long>("price")?.let { value -> if(saved.get<Int>("moneyVersion")==1) value else runCatching { Math.multiplyExact(value,100L) }.getOrNull() },
                     saved
                         .get<ArrayList<String>>("amenities")
                         ?.mapNotNull { name -> Amenity.entries.find { it.name == name } }
                         ?.toSet()
                         .orEmpty(),
                     RoomKind.entries.find { it.name == saved.get<String>("roomKind") },
+                    saved["distance"],
                 ),
             sort =
                 SortOrder.entries.find { it.name == saved.get<String>("sort") }

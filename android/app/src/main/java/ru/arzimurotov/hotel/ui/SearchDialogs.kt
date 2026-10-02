@@ -344,10 +344,12 @@ fun FiltersDialog(
 ) {
     var stars by rememberSaveable { mutableStateOf(query.filters.stars) }
     var rating by rememberSaveable { mutableDoubleStateOf(query.filters.minRating) }
-    var price by rememberSaveable { mutableStateOf(query.filters.maxPrice?.toString().orEmpty()) }
+    var price by rememberSaveable { mutableStateOf(query.filters.maxPrice?.div(100)?.toString().orEmpty()) }
     var amenities by rememberSaveable { mutableStateOf(query.filters.amenities) }
     var roomKind by rememberSaveable { mutableStateOf(query.filters.roomKind) }
-    val priceValid = price.isEmpty() || (price.toLongOrNull()?.let { it > 0 } == true)
+    var distance by rememberSaveable {mutableStateOf(query.filters.maxDistanceKm?.toString().orEmpty())}
+    val priceValid = (price.isEmpty() || (price.toLongOrNull()?.let { it in 1..9999999999L } == true)) &&
+        (distance.isEmpty() || distance.toDoubleOrNull()?.let {it.isFinite()&&it in 0.0..1000.0}==true)
     FormDialog(
         "Фильтры",
         dismiss,
@@ -355,7 +357,7 @@ fun FiltersDialog(
             confirm(
                 query.copy(
                     filters =
-                        SearchFilters(stars, rating, price.toLongOrNull(), amenities, roomKind)
+                        SearchFilters(stars, rating, price.toLongOrNull()?.times(100), amenities, roomKind,distance.toDoubleOrNull())
                 )
             )
         },
@@ -368,6 +370,7 @@ fun FiltersDialog(
                 price = ""
                 amenities = emptySet()
                 roomKind = null
+                distance = ""
             },
             Modifier.testTag("reset_filters"),
         ) {
@@ -407,6 +410,7 @@ fun FiltersDialog(
                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                 ),
         )
+        OutlinedTextField(distance,{distance=it.replace(',','.').take(8)},label={Text("До центра, максимум км")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("distance_filter"))
         Text("Удобства", style = MaterialTheme.typography.titleMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Amenity.entries.forEach { a ->

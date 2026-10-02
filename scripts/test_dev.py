@@ -32,10 +32,10 @@ class DevelopmentCommandsTest(unittest.TestCase):
             self.assertNotIn(" -k ", options)
             self.assertIn("-h 127.0.0.1 -p 55432", options)
 
-    def test_macos_socket_path_with_spaces_is_quoted(self):
+    def test_macos_long_path_disables_unix_socket(self):
         # Mac-ветку моделируем POSIX-путём даже при запуске теста на Windows.
         with patch.object(dev, "WINDOWS", False), patch.object(dev, "LOCAL", PurePosixPath("/a folder/.local")):
-            self.assertIn('-k "/a folder/.local"', dev.postgres_options())
+            self.assertIn('-k ""', dev.postgres_options())
 
     def test_windows_server_uses_batch_files_without_execve(self):
         with patch.object(dev, "WINDOWS", True), patch.object(dev, "start_db"), \

@@ -65,4 +65,13 @@ class DatabaseService(config: ServerConfig) : DatabaseProbe, AutoCloseable {
     override fun close() {
         pool.close()
     }
+
+    /** JDBC внутри транзакции Exposed. Пул и блокирующий SQL не занимают Netty event loop.
+     * Автоматический повтор отключён: запись нельзя незаметно выполнить повторно. */
+    suspend fun <T> query(block: (java.sql.Connection) -> T): T = withContext(Dispatchers.IO) {
+        transaction(database) {
+            maxAttempts = 1
+            block(connection.connection as java.sql.Connection)
+        }
+    }
 }

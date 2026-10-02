@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import org.junit.Rule
 import org.junit.Test
 import ru.arzimurotov.hotel.MainActivity
+import ru.arzimurotov.hotel.domain.SeedCatalog
 
 /** Интеграция Hilt ViewModel, русских ресурсов и восстановления навигации Activity. */
 class MainActivityTest {
@@ -12,17 +13,21 @@ class MainActivityTest {
 
     @Test
     fun activityRecreationPreservesResultsAndFavorite() {
+        compose.waitUntil(15000) { compose.onAllNodesWithTag("search_screen").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("destination").performScrollTo().performClick()
-        compose.onNodeWithTag("country_uz").performClick()
-        compose.onNodeWithTag("city_tashkent").performClick()
+        compose.onNodeWithTag("country_${SeedCatalog.uuid("uz")}").performClick()
+        compose.onNodeWithTag("city_${SeedCatalog.uuid("tashkent")}").performClick()
         compose.onNodeWithTag("dialog_confirm").performClick()
         compose.onNodeWithTag("search_submit").performScrollTo().performClick()
-        compose.onNodeWithTag("results_grid").performScrollToNode(hasTestTag("favorite_tashkent-6"))
-        compose.onNodeWithTag("favorite_tashkent-6").performClick()
+        val favorite="favorite_${SeedCatalog.uuid("tashkent-6")}"
+        compose.waitUntil(20000) {compose.onAllNodesWithTag("server_search_success").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("results_grid").performScrollToNode(hasTestTag(favorite))
+        compose.onNodeWithTag(favorite).performClick()
         compose.activityRule.scenario.recreate()
+        compose.waitUntil(20000) {compose.onAllNodesWithTag("server_search_success").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithTag("results_screen").assertExists()
-        compose.onNodeWithTag("results_grid").performScrollToNode(hasTestTag("favorite_tashkent-6"))
+        compose.onNodeWithTag("results_grid").performScrollToNode(hasTestTag(favorite))
         compose.onNodeWithContentDescription("Убрать из избранного").assertExists()
-        compose.onNodeWithTag("favorite_tashkent-6").performClick()
+        compose.onNodeWithTag(favorite).performClick()
     }
 }

@@ -1,242 +1,134 @@
-# Устройство проекта и выполненные работы
+# Структура и выполненные работы — 0.6.0
 
-Документ описывает **фактический код Android 0.2.0 / Ktor 0.1.0**, а не все возможности
-будущей системы. Он предназначен для продолжения разработки на MacBook/Asus и для
-объяснения практической части курсовой. Подробные KDoc-комментарии размещены также
-рядом с соответствующими классами и функциями.
+## Выполненные этапы
 
-## 1. Что выполнено по этапам
+1. Платформа: независимые Android/Ktor Gradle-проекты, Wrapper, Hilt, health, PostgreSQL,
+   Flyway V1, HikariCP/Exposed, безопасный переносимый локальный запуск.
+2. UI: русская навигация, поиск/формы/фильтры, галерея, услуги, избранное, места,
+   адаптивная панель. Фабрика каталога была локальной.
+3. SQL/API: V2 без изменения V1, 36 гостиниц/432 номера/30 мест, нормализованные связи,
+   устойчивый seed, регистрация/вход/профиль/Keystore, текущие серверные роли,
+   только API без fallback, USB/debug-настройка и администраторская сводка.
 
-### Этап 1 — платформа
+4. SQL-поиск: диапазон тарифов, наличие физической комнаты на весь интервал,
+   room_blocks, фильтры/сортировка/пагинация на сервере.
+5. Заказы: несколько комнат, блокировки и повторная проверка, услуги/трансфер,
+   серверный расчёт, снимки истории и идемпотентность.
+6. Демооплата: 15 минут, история/отмена, фоновые статусы, PDFBox/SAF/печать.
+GitHub/Windows workflow существуют. Карта/Room/полный ADMIN CRUD ещё не реализованы.
 
-Созданы два независимых Gradle-проекта: Android-клиент и Ktor-сервер. Общий каталог
-версий связывает их настройки. Добавлены Wrapper с контрольной суммой, debug/release
-конфигурации Android, Hilt, Ktor Client и настоящая диагностика сервера.
-
-На Mac настроен отдельный PostgreSQL-кластер проекта: `.local/postgres`, порт 55432,
-база `hotel_coursework`, ограниченная роль `hotel_app`. Пароли создаются автоматически
-и не включаются в Git. Flyway применяет `V1__foundation.sql`, HikariCP поддерживает
-небольшой пул соединений, Exposed выполняет SQL-проверку готовности.
-Маршруты `/health` и `/api/v1/health` различают доступность процесса и готовность базы.
-
-Добавлены модульные/API/UI-тесты, Dokka и инструкции. Подробный протокол:
-[STAGE_1_VERIFICATION.md](STAGE_1_VERIFICATION.md).
-
-### Этап 2 — дизайн, навигация и локальный каталог
-
-Создан самостоятельный светлый интерфейс Material 3: тёмно-синий основной цвет,
-тёплый акцент, белые карточки, единые кнопки и состояния загрузки/ошибки/пустого списка.
-Весь интерфейс, включая календарь, работает на русском языке.
-
-Добавлены четыре раздела: поиск, места, бронирования и профиль. Работают выбор
-направления, дат и гостей; поиск по имени; фильтры; сортировка; подробная гостиница;
-галерея; избранное; предварительная стоимость номера и услуг; информационные места.
-На широком экране — NavigationRail и сетка из двух колонок.
-
-Локальные данные: 3 страны, 6 городов, 36 гостиниц (по 2 гостиницы каждой категории
-3/4/5 звёзд в городе), 30 мест и 3 иллюстрации. Страны/города реальные, остальные
-сведения вымышлены. Галерея повторно использует 3 изображения, а не 36 фотосессий.
-Источники и промпты: [ASSETS.md](ASSETS.md).
-
-### Подготовка репозитория для двух компьютеров
-
-Переведены и расширены авторские комментарии в Kotlin и скриптах на русском.
-`scripts/dev.py` дополнен Windows-путями, `.exe`, запуском `.bat` и отсутствием
-Unix-сокетов в PostgreSQL под Windows. Добавлены 10 тестов переносимости и защиты
-локальной базы; `docs/WINDOWS.md` описывает clone, запуск Android/SQL/backend и обмен кодом.
-В GitHub Actions добавлена Windows-сборка без паролей: APK, Android unit/lint,
-backend-тесты и Python-тесты. Наличие workflow само по себе не означает успешный запуск:
-результат конкретного коммита проверяется во вкладке Actions.
-
-## 2. Структура каталогов
+## Каталоги
 
 ```text
-Hotel-Booking-Android/
-├── android/                     Android-проект, открывается в Android Studio
-│   ├── app/src/main/            приложение, manifest и встроенные ресурсы
-│   │   └── java/ru/arzimurotov/hotel/
-│   │       ├── MainActivity.kt  launcher Activity, подписки на ViewModel
-│   │       ├── HotelApplication.kt  контейнер Hilt
-│   │       ├── domain/          модели, контракты, поиск и расчёт
-│   │       ├── data/            локальный каталог и HTTP-репозиторий диагностики
-│   │       ├── di/              связывание зависимостей
-│   │       └── ui/              Compose-экраны, диалоги, ViewModel, навигация
-│   ├── app/src/debug/          HTTP-разрешение только для локального эмулятора
-│   ├── app/src/test/           Android unit-тесты на JVM
-│   ├── app/src/androidTest/    UI/Activity-тесты на устройстве
-│   ├── gradle/wrapper/         фиксированный Gradle Wrapper
-│   └── gradlew / gradlew.bat   запуск Gradle на Unix / Windows
-├── server/                     отдельный Ktor Gradle-проект
-│   ├── src/main/kotlin/        HTTP-модуль, конфигурация, инфраструктура SQL
-│   ├── src/main/resources/db/migration/  версионированные миграции Flyway
-│   ├── src/test/               API-тесты с подменой DatabaseProbe
-│   └── gradlew / gradlew.bat
-├── gradle/libs.versions.toml    единый каталог версий Android и backend
-├── scripts/                    локальный запуск и его Python-тесты
-├── docs/                       API, требования, этапы, структура, Windows и изображения
-├── .github/workflows/          проверка сборки на Windows
-├── .env.example                описание переменных, не реальные пароли
-├── .gitattributes              LF для исходников, CRLF для .bat, бинарные картинки/JAR
-└── .gitignore                  исключение локальных баз, ключей, SDK и build
+HotelCoursework/
+  android/      Android Studio открывает этот Gradle-проект
+    app/src/main/java/ru/arzimurotov/hotel/
+      ui/       Compose, четыре ViewModel, Navigation, однонаправленный StateFlow
+      data/     REST репозитории, ApiConnection, SessionStore
+      domain/   контракт readiness
+      di/       Hilt composition root
+    app/src/test/         JVM unit
+    app/src/androidTest/  UI/Activity/Keystore проверки на AVD
+  server/       отдельный JVM/Ktor Gradle-проект
+    src/main/kotlin/ru/arzimurotov/hotel/server/
+      Application.kt          composition root, health, безопасные ошибки
+      ApiRoutes.kt            HTTP/DTO/пагинация/маршруты
+      AuthService.kt          правила учётной записи, JWT, Argon2, UserRepository
+      SearchService.kt        SearchService + SearchRepository, SQL-наличие/фильтры
+      BookingService.kt       BookingService + BookingRepository, блокировки/история/оплата
+      ReceiptService.kt       PDFBox, кириллица/переносы, выпуск после транзакции
+      CatalogRepository.kt    prepared SQL, seed, сборка каталога без N+1
+      DatabaseService.kt      IO, Hikari, Flyway, Exposed транзакции
+      ServerConfig.kt         конфигурация, редактированный toString
+    src/main/resources/db/migration/ V1–V5 (ранее применённые файлы не изменяются)
+    src/test/                 health, auth правила, SQL/API интеграция
+  shared/src/main/kotlin/ru/arzimurotov/hotel/domain/
+    Catalog.kt    модели/контракты, локальная валидация и расчёт
+    ApiModels.kt  общий JSON-контракт
+    BookingModels.kt поиск, актуальные предложения, заказы, услуги и демооплата
+    SeedCatalog.kt единая детерминированная фабрика исходных данных
+  gradle/libs.versions.toml   общие закреплённые версии
+  scripts/dev.py             сервер/БД/USB/create-admin/test-sql
+  scripts/ui_tests.py         безопасный runner только явно указанного AVD
+  docs/                      API, ER, этапы, требования и запуск
 ```
 
-`.local`, `.idea`, `.gradle`, `build` и `local.properties` создаются отдельно на каждом
-компьютере и не отправляются в GitHub. Папки `android` и `server` нужно сохранять внутри
-полного репозитория: они используют общий `gradle/libs.versions.toml` через `..`.
+shared — общий исходный source set двух Gradle-проектов, не отдельный Android module.
+AGP 9: AndroidSourceSet.kotlin; Ktor: Kotlin JVM sourceSet.
+Модели не импортируют Android/Compose/HTTP/SQL; JSON-аннотации — осознанная общая
+зависимость протокола. Это компактное разделение UI–Domain–Data, а не обещание
+полного многомодульного Clean Architecture с отдельным use-case на каждый экран.
 
-## 3. Архитектура Android: MVVM и разделение ответственности
+## Android: события и состояния
 
-Используются принципы слоёв UI–Domain–Data. Это компактный каркас Clean Architecture,
-**не** полностью реализованная система отдельных use-case-модулей: доменные операции
-пока представлены функциями и интерфейсами в одном Android-модуле.
+Compose → callback → ViewModel → Repository → Ktor Client → API.
+Обратно: DTO → неизменяемый StateFlow → collectAsStateWithLifecycle → Compose.
 
-```text
-Compose-экран → callback → ViewModel → интерфейс репозитория → реализация Data
-                       ← StateFlow ← новое неизменяемое состояние
-```
+- BrowseViewModel: только один load job; SavedStateHandle хранит форму/избранное,
+  SQL UUID нормализуются по legacyId, неизвестные объекты удаляются безопасно.
+  При сетевом сбое уже загруженный RAM-снимок можно продолжать смотреть; новые данные
+  не выдумываются. Для другого backend снимок сбрасывается.
+- AuthViewModel: Guest либо профиль из GET /profile; busy блокирует дубль отправки,
+  fieldErrors относятся к полям; 401 очищает сеанс. Смена источника отменяет старую операцию.
+- FoundationViewModel: независимая реальная проверка liveness/readiness.
+- AuthForm: пароль/подтверждение только remember (не Bundle/Saveable), стираются после submit.
+  Ввод email/имени сохраняется при пересоздании. Истечение JWT требует нового входа.
+- SessionStore: Keystore AES-GCM, atomic ciphertext noBackupFilesDir; пароль не хранится.
+- ApiConnection: только emulator и USB в debug; настройка достижима при ошибке каталога.
+- NetworkModule: один HTTP-клиент, таймауты, production RemoteCatalogRepository.
+  DemoCatalogRepository оставлен исключительно тестам; скрытого offline seed нет.
 
-- **UI:** отображение и пользовательские события. Не открывает SQL-соединения и не
-  создаёт HTTP-клиент внутри composable. Локальные черновики диалогов хранятся отдельно
-  от подтверждённой формы. `testTag` позволяет UI-тестам находить стабильные узлы.
-- **ViewModel:** `BrowseViewModel` управляет каталогом/формой/избранным;
-  `FoundationViewModel` — независимой диагностикой API. Для каждой операции действует
-  защита от повторного параллельного запуска. CancellationException не скрывается.
-- **Domain:** модели Kotlin, `CatalogRepository`, `HealthRepository`, правила валидации,
-  локальный поиск и расчёт. Не импортирует Compose, HTTP DTO, Hilt или Exposed.
-- **Data:** `DemoCatalogRepository` создаёт каталог, `RemoteHealthRepository`
-  преобразует HTTP JSON в `SystemHealth`. Структура ответа API скрыта от экранов.
-- **DI:** `NetworkModule` в Hilt SingletonComponent связывает интерфейсы с реализациями
-  и предоставляет один Ktor Client/OkHttp с таймаутами 3–5 секунд.
+Маршруты: search, places, bookings, profile, results, favorites, system, auth, admin,
+hotel/{id}, gallery/{id}/{page}, quote/{id}/{kind}, place/{id}.
+Большие объекты не передаются в маршруте. NavigationRail от 720 dp.
+AuthScreens.kt отвечает за вход/регистрацию, настоящий профиль и read-only ADMIN.
+TravelViewModel обслуживает независимые jobs результатов/наличия и одну операцию заказа.
+RemoteTravelRepository передаёт DTO; SessionStore хранит шифрованный ключ незавершённого POST.
+CheckoutScreen оформляет заказ по актуальному серверному предложению и ценам услуг.
+OrdersScreen показывает собственные SQL-заказы и серверный таймер; ReceiptActions — SAF/печать.
+Локальный QuoteScreen оставлен только для детерминированных старых UI-тестов. Production
+MainActivity всегда передаёт TravelState и открывает реальный CheckoutScreen.
 
-`MainActivity` собирает StateFlow через `collectAsStateWithLifecycle`, задаёт русскую
-локаль, тему и системные панели, затем передаёт данные/события в `HotelApp`.
-`SavedStateHandle` сохраняет примитивы, epochDay дат и имена enum, а не Activity/Context.
-Это восстановление состояния приложения, а не серверный аккаунт или долговременный SQL.
+## Backend: границы ответственности
 
-## 4. Карта файлов и реализованных экранов
+Routes — DTO/HTTP, AuthService — нормализация/валидация/права/профиль,
+UserRepository/CatalogRepository — SQL. Зависимости передаются конструкторами, без Android Hilt.
+Catalogue GET не изменяет базу. SearchService выполняет SQL-поиск/наличие;
+BookingService управляет заказами и демоплатежами; ReceiptService формирует PDF
+после завершения транзакции. Фоновая задача обслуживает резервы каждую минуту.
 
-| Файл в `ui` | Ответственность |
-|---|---|
-| `HotelApp.kt` | Навигационный граф, вкладки, back stack, адаптивная оболочка, loading/error |
-| `CatalogScreens.kt` | Форма поиска, главная, результаты/избранное, места и карточки мест |
-| `SearchDialogs.kt` | Направление, даты, гости, фильтры; черновик и подтверждение |
-| `DetailScreens.kt` | Гостиница, галерея, выбор номера/услуг для расчёта, подробности места |
-| `AccountScreens.kt` | Пустые брони, гостевой профиль, объяснение будущего входа |
-| `TravelComponents.kt` | Палитра, Canvas-иконки, изображения, карточки, цены и пустые состояния |
-| `FoundationScreen.kt` | Тема и диагностика реального backend/SQL |
-| `BrowseViewModel.kt` | StateFlow каталога, параметры поиска и избранное |
-| `FoundationViewModel.kt` | Состояния Loading/Ready/Unavailable и повторная проверка API |
+JDBC запускается на Dispatchers.IO в Exposed transaction; maxAttempts=1 исключает скрытое
+повторение записи. Hikari максимум 4 соединения. PreparedStatement закрывается use.
+Каталог собирается пакетными запросами, а не отдельным запросом на каждый hotel.
+Flyway миграции применяются до HTTP; seed в одной транзакции использует ON CONFLICT DO NOTHING.
+Стабильные namespace UUID позволяют повторный запуск и перенос legacy избранного.
+Источником ответов служат реальные строки SQL, а не runtime фабрика.
 
-Навигация использует маршруты `search`, `places`, `bookings`, `profile`, `results`,
-`favorites`, `system`, `hotel/{id}`, `gallery/{id}/{page}`, `quote/{id}/{kind}`,
-`place/{id}`. При неизвестном id выводится корректное пустое состояние.
-Переходы между вкладками используют `launchSingleTop`, `saveState` и `restoreState`.
-На телефоне вложенные экраны имеют кнопку назад; нижняя панель относится к главным вкладкам.
-От 720 dp доступна боковая панель; ширина контента ограничена 1200 dp.
+Argon2id pure JVM Bouncy Castle 1.86 переносим между ARM64 macOS и x86_64 Windows.
+Две задачи одновременно, salt 16 байт, hash 32 байта; параметры PHC проверяются.
+JWT Auth0 (зависимость Ktor auth-jwt) проверяется AuthService до обращения к protected route;
+Ktor Authentication plugin в этом компактном варианте отдельно не устанавливается.
+После JWT дополнительно читается текущий active/role SQL, поэтому снятие права действует сразу.
+Публичная JSON-регистрация не содержит роль; неизвестные поля запрещены.
 
-## 5. Модели и бизнес-правила прототипа
+## Деньги и ограничения
 
-| Модель / операция | Назначение и ограничения |
-|---|---|
-| `Catalog`, `Country`, `City` | Снимок данных, принадлежность города стране и её валюта |
-| `Hotel`, `Amenity`, `Photo` | Гостиница, удобства, ключи встроенных фото; rating не равен stars |
-| `RoomOffer`, `RoomKind` | Тип номера с вместимостью/площадью/ценой, не физическая комната |
-| `HotelService` | Цена услуги и посуточный/разовый способ начисления |
-| `Place`, `PlaceCategory` | Информационный объект города; без билетов или транзакций |
-| `SearchQuery`, `SearchFilters`, `SortOrder` | Направление, даты, гости, ограничения и порядок |
-| `SystemHealth` | Доступность HTTP-сервера, готовность SQL и версия backend |
+SQL NUMERIC(12,2); JVM BigDecimal ↔ Long minor units через longValueExact.
+UI отображает major units через BigDecimal(value,2). Бюджет формы вводится в целых major
+units и переводится ×100, расчёт сохраняет дробную цену и не использует Double.
+Double остаётся только для рейтинга/расстояния.
 
-Валидный запрос: дата заезда не в прошлом, 1–90 ночей, 1–8 взрослых, 0–4 детей,
-1–4 номера, не менее одного взрослого на номер и до четырёх гостей на номер.
-Город должен относиться к стране; без города поиск охватывает города только этой страны.
-Так цены в UZS, RUB и TRY не сравниваются как одинаковые денежные единицы.
+Запрос комнат выдаёт физические комнаты и цены, но availabilityGuaranteed=false.
+V3 содержит room_blocks и ограничения тарифов; V4 — bookings, booking_rooms,
+booking_services; V5 — payments и receipts. Реальные SQL-заказы есть, услуги и
+денежные операции учебные: внешнему отелю/банку запрос не отправляется.
+Places — общие городские объекты; hotel_places не размножает ресторан на каждую гостиницу.
+Полный ADMIN CRUD, карта и offline кеш требуют следующих этапов и миграций.
 
-День выезда не считается ночью. UTC-преобразование DateRangePicker исключает смещение
-календарной даты часовым поясом. `guestsPerRoom` округляет долю гостей вверх.
-Поиск проверяет наличие хотя бы **типа** номера с нужной вместимостью, категорией и
-бюджетом. Он не проверяет занятость конкретных комнат по датам.
-Сортировка по цене использует `matchingPrice`, чтобы не рекламировать неподходящий
-дешёвый двухместный номер группе из трёх гостей.
+## Источники решений
 
-Сумма `previewTotal`:
-
-```text
-номер за ночь × ночи × число номеров
-+ посуточные услуги × ночи × число номеров
-+ разовые услуги один раз
-```
-
-В демонстрации завтрак посуточный, трансфер и поздний выезд разовые. Цена хранится
-в Long — целых единицах валюты каталога. Налогов, копеек, курсов и настоящего списания
-нет; будущий backend будет отдельно рассчитывать финальную стоимость.
-
-## 6. Backend и реальная SQL-база
-
-`Application.kt` включает JSON-сериализацию и два диагностических маршрута.
-`ServerConfig.kt` читает окружение, проверяет порт/пароль и скрывает пароль в `toString`.
-`DatabaseService.kt` применяет Flyway, подключает Exposed к HikariCP и проверяет SQL
-через `SELECT 1` в ограниченной по времени транзакции на `Dispatchers.IO`.
-`DatabaseProbe` позволяет заменять готовность БД в API-тестах.
-
-В SQL сейчас есть только `app_metadata` и служебная история Flyway.
-**Таблиц пользователей, гостиниц, номеров, броней, оплат и чеков ещё нет.**
-Нельзя путать модели `domain/Catalog.kt` с уже созданными SQL-таблицами.
-Routes–services–repositories, JWT и административные операции из архитектурного плана
-будут добавлены вместе с бизнес-данными, а не объявлены готовыми задним числом.
-
-Применённый `V1__foundation.sql` намеренно не переписывается, в том числе ради перевода
-старого английского комментария: это изменило бы checksum Flyway существующей базы.
-Новые изменения оформляются следующими миграциями `V2__...`, `V3__...`.
-Параметры API/будущие группы: [API.md](API.md).
-
-## 7. Безопасность и переносимость
-
-Android не подключается напрямую к PostgreSQL. Backend слушает 127.0.0.1, а эмулятор
-видит свой компьютер через 10.0.2.2. HTTP разрешён только для debug и этого адреса;
-release использует HTTPS-заглушку, пока нет развёрнутого сервера.
-Пароли не включаются в URL, JSON диагностики или Git. `.env.example` содержит лишь
-контракт переменных; сервер автоматически не читает `.env`.
-
-`scripts/dev.py` использует независимый кластер на 55432, проверяет data_directory
-и не останавливает чужой процесс ради освобождения порта. Пароли генерируются как
-48 hex-символов; повторно загруженный конфиг также проверяется перед SQL-подстановкой.
-На Unix доступ к файлу ограничен режимом 600; на Windows действуют локальные ACL.
-
-Wrapper для Windows — `.bat`, бинарные инструменты PostgreSQL — `.exe`; Unix-сокеты
-не передаются Windows. JDK/PostgreSQL выбираются из локальных путей либо `JAVA_HOME`
-и `HOTEL_PG_BIN`. Android Studio самостоятельно задаёт SDK. Выбор JVM IDE остаётся
-локальным, `gradle-daemon-jvm.properties` не перезаписывается и не распространяется.
-
-Git переносит общий код/ресурсы/миграции, но не локальные базы, реальные пользовательские
-заказы и эмуляторы. На Mac — ARM64 AVD, на обычном Asus Intel/AMD — x86_64 AVD.
-Подробный порядок: [WINDOWS.md](WINDOWS.md).
-
-## 8. Как проверяется результат
-
-- **20 Android unit:** HealthRepository/ViewModel, валидность запроса, фильтры,
-  подходящая цена, расчёт услуг, состав каталога, сохранение/восстановление состояния.
-- **13 Android UI/Activity:** диагностика, вкладки, поиск/фильтры, пустые результаты,
-  избранное, детали/галерея/расчёт, черновики и реальное пересоздание MainActivity с Hilt.
-- **4 backend:** доступность, готовность/503, отсутствие секретов и конфигурация.
-- **10 Python unit:** пути macOS/Windows, пользовательские пути, `.exe`/`.bat`, настройки
-  сокетов, отказ от чужого конфига/порта и непубликуемые пароли.
-
-Первые три группы подтверждены на Mac для этапа 2. UI выполнен в двух размерах одного
-API 36 AVD — телефон/планшет, а не на трёх разных устройствах. Python-тесты проверяют
-и Windows-ветку с подменой процессов; это не запуск настоящей Windows PostgreSQL.
-Дополнительная независимая Windows-проверка сборки предусмотрена в GitHub Actions;
-статус запуска не заменяет проверку вашего Asus. Модульные тесты не заменяют smoke
-с настоящей SQL-базой. Протокол: [STAGE_2_VERIFICATION.md](STAGE_2_VERIFICATION.md).
-
-## 9. Что будет реализовано дальше
-
-Следующий шаг — этап 3: бизнес-таблицы/миграции, исходный SQL-каталог, регистрация,
-вход и USER/ADMIN права. Затем подключение поиска к API, серверная доступность/цены,
-транзакционное бронирование, услуги и 15-минутные резервы, идемпотентность,
-демооплата/оплата на месте, личные заказы и PDF-подтверждение, Room-кеш, карта и администратор.
-
-Пока **не реализованы** JWT, бронирования, оплата, PDF, Room, Google Maps, CRUD администратора,
-продажа билетов, такси и аренда автомобиля. Последние три модуля — отдельные будущие
-расширения после гостиничной версии. Никаких заказов реальным компаниям и списаний нет.
-Соответствие курсовому заданию отслеживается в [REQUIREMENTS.md](REQUIREMENTS.md),
-план — в [ROADMAP.md](ROADMAP.md).
+[Built-in Kotlin](https://developer.android.com/build/migrate-to-built-in-kotlin),
+[OWASP Argon2id](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html),
+[Bouncy Castle 1.86](https://www.bouncycastle.org/resources/new-release-bouncy-castle-java-1-86/),
+[Android Keystore](https://developer.android.com/privacy-and-security/keystore),
+[AndroidX Test](https://developer.android.com/jetpack/androidx/releases/test).

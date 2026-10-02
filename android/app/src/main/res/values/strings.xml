@@ -2,7 +2,7 @@
     <string name="app_name">Гостиница</string>
     <string name="foundation_title">Состояние платформы</string>
     <string name="foundation_subtitle">Реальная связь Android → Ktor → PostgreSQL</string>
-    <string name="foundation_stage">Этап 1 · Платформа проекта</string>
+    <string name="foundation_stage">Этапы 3–6 · Каталог, бронирование и демооплата</string>
     <string name="connection_loading">Проверяем соединение…</string>
     <string name="connection_ready">Система готова</string>
     <string name="connection_error">Нет соединения с системой</string>
@@ -16,6 +16,6 @@
     <string name="connection_version">Версия системы: %1$s</string>
     <string name="connection_api">Адрес API: %1$s</string>
     <string name="foundation_next">Интерфейс уже доступен</string>
-    <string name="foundation_description">На этапе 2 каталог работает локально. Данные гостиниц не загружаются из SQL. Этот экран отдельно проверяет сервер и базу данных. Вход, каталог API и бронирование будут подключены по плану следующих этапов.</string>
+    <string name="foundation_description">Каталог, поиск свободных номеров, профиль, заказы и демооплата работают через Ktor REST API и PostgreSQL. Здесь проверяется доступность сервера и базы. Карта, offline-кеш и редактирование администратором будут добавлены позже.</string>
     <string name="demo_notice">Учебный проект. Реальные платежи и заказы внешним компаниям не выполняются.</string>
 </resources>

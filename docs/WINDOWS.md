@@ -101,14 +101,18 @@ py -3 -m unittest discover -s scripts -p "test_*.py" -v
 Set-Location android
 .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 .\gradlew.bat :app:dokkaGeneratePublicationHtml
-# Следующая команда требует запущенный эмулятор.
-.\gradlew.bat :app:connectedDebugAndroidTest
+# UI запускается из корня только на конкретном AVD, личный телефон не используется.
+Set-Location ..
+py -3 scripts/ui_tests.py --serial emulator-5554
+py -3 scripts/dev.py test-sql
+Set-Location android
 Set-Location ..\server
 .\gradlew.bat test installDist dokkaGeneratePublicationHtml
 ```
 
 `smoke` требует запущенного сервера; остальные модульные тесты настоящую базу не требуют.
-После UI-тестов APK может быть удалён тестовым runner: нажмите `app → Run` заново.
+Не используйте connectedDebugAndroidTest при подключённом телефоне: Gradle может выбрать
+все устройства и удалить приложение. Наш ui_tests.py устанавливает APK с -r только на AVD.
 APK находится в `android\app\build\outputs\apk\debug\app-debug.apk`.
 В GitHub Actions настроены сборка APK, Android unit/lint, backend-тесты и проверки скрипта
 на Windows. Это не проверка вашего Asus, не UI-тест на AVD и не smoke реальной SQL-базы.
@@ -141,9 +145,11 @@ Git Credential Manager/Android Studio; не добавляйте токены в
 `git status`, сохраните свой коммит и осознанно разрешите расхождение истории.
 
 **Git синхронизирует код, а не базы и настройки IDE.** PostgreSQL, учётные данные и
-заказы на Mac и Asus будут локальными и независимыми. Сейчас каталог одинаков, потому
-что включён в код. На следующих этапах одинаковые стартовые данные будут добавляться
-миграциями/seed; единые пользовательские заказы потребуют отдельного общего backend.
+заказы на Mac и Asus будут локальными и независимыми. Каталог создаётся SQL seed;
+редактирование, аккаунты и заказы локальны. Миграции V1–V5 применяются автоматически.
+btree_gist входит в PostgreSQL; при внешней БД для расширения нужны соответствующие права.
+Приложение не обходит ошибку миграции удалением ограничений или пересозданием данных.
+Единые пользовательские заказы потребуют отдельного общего backend.
 Не переносите бинарную `.local\postgres` между macOS и Windows. Для переноса реальных
 данных позднее используйте отдельно согласованный `pg_dump`/restore, а не Git.
 
