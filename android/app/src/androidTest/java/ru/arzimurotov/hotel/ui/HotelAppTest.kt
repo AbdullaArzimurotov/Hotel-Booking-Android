@@ -101,9 +101,12 @@ class HotelAppTest {
         compose.onNodeWithTag("sort_PRICE").performClick()
         compose.runOnIdle { assertEquals(SortOrder.PRICE, latest.query.sort) }
         compose.onNodeWithTag("hotel_name_search").performTextInput("Нет такой гостиницы")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
         compose.onNodeWithTag("results_grid").performScrollToNode(hasText("Ничего не найдено"))
         compose.onNodeWithText("Ничего не найдено").assertIsDisplayed()
-        compose.onNodeWithText("Сбросить фильтры").performClick()
+        compose
+            .onNodeWithText("Сбросить фильтры")
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         compose.runOnIdle {
             assertEquals("", latest.query.name)
             assertEquals(0, latest.query.filters.activeCount)
@@ -125,7 +128,8 @@ class HotelAppTest {
         compose.onNodeWithTag("hotel_detail_list").performScrollToNode(hasTestTag("room_STANDARD"))
         compose.onNodeWithTag("room_STANDARD").performClick()
         compose.onNodeWithTag("quote_screen").assertExists()
-        compose.onNodeWithTag("service_transfer").performScrollTo().performClick()
+        compose.onNodeWithTag("quote_list").performScrollToNode(hasTestTag("service_transfer"))
+        compose.onNodeWithTag("service_transfer").performClick()
         compose.onNodeWithTag("quote_list").performScrollToNode(hasTestTag("quote_total"))
         compose.onNodeWithTag("quote_total").assertTextEquals("5 175 000 сум")
         compose.onNodeWithTag("booking_info").performScrollTo().performClick()

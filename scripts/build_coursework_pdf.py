@@ -82,15 +82,15 @@ def markdown(lines):
             for line in path.read_text(encoding='utf-8').splitlines():
                 if not line.strip():result.append(Spacer(1,8));continue
                 # Текст программы не уменьшается до мелкого шрифта; длинные строки переносятся.
-                result.append(Paragraph(escape(line.strip()).replace(' ','&#160;'),ST['code']))
+                result.append(Paragraph(escape(line.rstrip()).replace(' ','&#160;'),ST['code']))
         elif s=='[[screenshots]]':
             labels={'search':'Поиск проживания','profile':'Личный кабинет','paid_order':'Заказ и демооплата','confirmation':'HTML-подтверждение','map':'Offline-карта','admin':'Кабинет администратора','admin_form':'Форма редактирования'}
             from PIL import Image as PILImage
-            for name,title in labels.items():
+            for number,(name,title) in enumerate(labels.items(),1):
                 path=ROOT/'docs/screenshots'/('09-'+name+'.png')
                 if not path.exists():continue
                 iw,ih=PILImage.open(path).size;scale=min(W/iw,(H-75)/ih)
-                result.extend([PageBreak(),Paragraph('Рисунок П2 - '+title,ST['caption']),Image(str(path),width=iw*scale,height=ih*scale)])
+                result.extend([PageBreak(),Paragraph(f'Рисунок П2.{number} - '+title,ST['caption']),Image(str(path),width=iw*scale,height=ih*scale)])
         else:result.append(source_para(s) if 'URL: ' in s else Paragraph(rich(s),ST['body']))
     return result
 
@@ -114,6 +114,9 @@ def main():
     build(lines,output/'Курсовая_работа_Гостиница_0_9.pdf','Курсовая работа «Гостиница» 0.9.0',True)
     start=next(i for i,l in enumerate(lines) if l.startswith('# 2. '));end=next(i for i,l in enumerate(lines) if l.startswith('# 3. '))
     architecture=['# 2. Разработка архитектуры системы']+lines[start+1:end]
+    sources=next(i for i,l in enumerate(lines) if l=='# Список используемой литературы')
+    appendix=next(i for i,l in enumerate(lines) if l.startswith('# Приложение 1'))
+    architecture+=lines[sources:appendix]
     build(architecture,output/'Архитектура_системы_0_9.pdf','Архитектура самостоятельной системы 0.9.0')
     print('PDF готовы:',output)
 

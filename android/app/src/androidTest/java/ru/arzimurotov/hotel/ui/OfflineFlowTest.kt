@@ -31,6 +31,9 @@ class OfflineFlowTest {
         }
 
     private fun screenshot(name: String) {
+        ui.waitForIdle()
+        // Dialog/WebView используют отдельные Android frames, не только Compose test clock.
+        android.os.SystemClock.sleep(400)
         val instrumentation =
             androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
         val file =
@@ -77,6 +80,7 @@ class OfflineFlowTest {
         if (ui.onAllNodesWithTag("recovery_saved").fetchSemanticsNodes().isNotEmpty())
             ui.onNodeWithTag("recovery_saved").performClick()
         ui.onNodeWithTag("profile_email").assertTextEquals(email)
+        ui.onNodeWithTag("recovery_saved").assertDoesNotExist()
     }
 
     private fun checkout(atHotel: Boolean = false) {
@@ -127,6 +131,28 @@ class OfflineFlowTest {
         ui.onNodeWithTag("html_confirmation").performScrollTo()
         wait("html_rendered")
         screenshot("confirmation")
+        val context =
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        if (
+            context.packageManager
+                .queryIntentActivities(
+                    android.content.Intent(
+                        android.content.Intent.ACTION_SENDTO,
+                        android.net.Uri.parse("mailto:"),
+                    ),
+                    0,
+                )
+                .isEmpty()
+        ) {
+            click("html_mail")
+            ui.waitUntil(10000) {
+                ui.onAllNodesWithText(
+                        "Почтового приложения нет. Документ сохранён в кабинете; установите Gmail/Mail.ru или сохраните HTML."
+                    )
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+        }
         click("html_close")
         ui.onAllNodes(prefix("cancel_")).onFirst().performScrollTo().performClick()
         ui.onNodeWithText("Да, отменить").performClick()
@@ -187,9 +213,13 @@ class OfflineFlowTest {
         click("admin_add")
         val countryName = "UI-страна " + java.util.UUID.randomUUID().toString().take(8)
         ui.onNodeWithTag("admin_field_name").performTextReplacement(countryName)
-        click("admin_save")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        ui.onNodeWithTag("admin_save")
+            .performScrollTo()
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         ui.waitUntil(15000) {
-            ui.onAllNodesWithText(countryName).fetchSemanticsNodes().isNotEmpty()
+            ui.onAllNodesWithTag("admin_field_name").fetchSemanticsNodes().isEmpty() &&
+                ui.onAllNodesWithText(countryName).fetchSemanticsNodes().isNotEmpty()
         }
         ui.onNodeWithTag("local_admin").assertExists()
         ui.onNodeWithTag("back").performClick()
