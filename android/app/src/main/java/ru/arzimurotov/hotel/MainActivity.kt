@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
     private val browseViewModel: BrowseViewModel by viewModels()
     private val authViewModel: AuthViewModel by viewModels()
     private val travelViewModel: ru.arzimurotov.hotel.ui.TravelViewModel by viewModels()
+    private val adminViewModel:ru.arzimurotov.hotel.ui.LocalAdminViewModel by viewModels()
     @Inject lateinit var connection: ApiConnection
 
     override fun attachBaseContext(newBase: android.content.Context) {
@@ -84,6 +85,9 @@ class MainActivity : ComponentActivity() {
                     onCancel=travelViewModel::cancel,onBookingRefresh=travelViewModel::refresh,
                     onReceipt=travelViewModel::receipt,onPdfConsumed=travelViewModel::consumePdf,
                     onCreatedConsumed=travelViewModel::consumeCreated,
+                    standalone=true,
+                    adminContent={back,changed->ru.arzimurotov.hotel.ui.LocalAdminScreen(adminViewModel,back,changed)},
+                    onChangePassword=authViewModel::changePassword,onResetPassword=authViewModel::resetPassword,onRecoveryConsumed=authViewModel::consumeRecovery,
                 )
             }
         }

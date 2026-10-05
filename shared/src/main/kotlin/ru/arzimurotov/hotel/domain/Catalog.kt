@@ -1,8 +1,8 @@
 package ru.arzimurotov.hotel.domain
 
-import kotlinx.serialization.Serializable
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import kotlinx.serialization.Serializable
 
 /**
  * Снимок каталога REST API третьего этапа: страны, города, гостиницы и городские места. Связи
@@ -25,11 +25,25 @@ data class Catalog(
 
 /** Страна задаёт валюту каталога; автоматический обмен валют пока не реализован. */
 @Serializable
-data class Country(val id: String, val name: String, val currency: String, val legacyId: String = id)
+data class Country(
+    val id: String,
+    val name: String,
+    val currency: String,
+    val legacyId: String = id,
+)
 
 /** Город связан со страной через countryId; caption используется в карточке направления. */
 @Serializable
-data class City(val id: String, val countryId: String, val name: String, val caption: String, val legacyId: String = id)
+data class City(
+    val id: String,
+    val countryId: String,
+    val name: String,
+    val caption: String,
+    val legacyId: String = id,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val timezone: String = "UTC",
+)
 
 /** Ключи трёх встроенных изображений. UI преобразует их в drawable, сеть не требуется. */
 enum class Photo {
@@ -56,8 +70,8 @@ enum class RoomKind(val title: String) {
 
 /**
  * Предложение типа номера, не конкретный физический номер и не остаток доступных комнат. capacity —
- * максимум гостей, area — площадь в м², pricePerNight — цена за номер/ночь в минимальных единицах валюты (копейках/тийинах/курушах)
- * страны. Денежные расчёты прототипа используют Long, не Double.
+ * максимум гостей, area — площадь в м², pricePerNight — цена за номер/ночь в минимальных единицах
+ * валюты (копейках/тийинах/курушах) страны. Денежные расчёты прототипа используют Long, не Double.
  */
 @Serializable
 data class RoomOffer(val kind: RoomKind, val capacity: Int, val area: Int, val pricePerNight: Long)
@@ -74,7 +88,7 @@ data class HotelService(
     val price: Long,
     val perNight: Boolean,
     val description: String,
-    val code:String = id,
+    val code: String = id,
 )
 
 /**
@@ -97,6 +111,11 @@ data class Hotel(
     val services: List<HotelService>,
     val photos: List<Photo>,
     val legacyId: String = id,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val photoFiles: List<String> = emptyList(),
+    val nearbyPlaceIds: List<String>? = null,
+    val amenityLabels: List<String> = emptyList(),
 ) {
     val startingPrice: Long
         get() = rooms.minOf { it.pricePerNight }
@@ -121,6 +140,9 @@ data class Place(
     val address: String,
     val photo: Photo,
     val legacyId: String = id,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val photoFile: String? = null,
 )
 
 enum class SortOrder(val title: String) {
@@ -217,19 +239,18 @@ fun Catalog.search(query: SearchQuery): List<Hotel> {
             .map { it.id }
             .toSet()
     val f = query.filters
-    val result =
-        hotels.filter { hotel ->
-            hotel.cityId in cityIds &&
-                (f.stars.isEmpty() || hotel.stars in f.stars) &&
-                hotel.rating >= f.minRating &&
-                hotel.amenities.containsAll(f.amenities) &&
-                hotel.name.contains(query.name.trim(), ignoreCase = true) &&
-                hotel.rooms.any {
-                    it.capacity >= query.guestsPerRoom &&
-                        (f.roomKind == null || it.kind == f.roomKind) &&
-                        (f.maxPrice == null || it.pricePerNight <= f.maxPrice)
-                }
-        }
+    val result = hotels.filter { hotel ->
+        hotel.cityId in cityIds &&
+            (f.stars.isEmpty() || hotel.stars in f.stars) &&
+            hotel.rating >= f.minRating &&
+            hotel.amenities.containsAll(f.amenities) &&
+            hotel.name.contains(query.name.trim(), ignoreCase = true) &&
+            hotel.rooms.any {
+                it.capacity >= query.guestsPerRoom &&
+                    (f.roomKind == null || it.kind == f.roomKind) &&
+                    (f.maxPrice == null || it.pricePerNight <= f.maxPrice)
+            }
+    }
     return when (query.sort) {
         SortOrder.RECOMMENDED ->
             result.sortedWith(compareByDescending<Hotel> { it.rating }.thenBy { it.id })

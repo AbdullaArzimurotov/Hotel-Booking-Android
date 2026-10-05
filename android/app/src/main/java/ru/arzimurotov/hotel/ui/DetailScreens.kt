@@ -25,14 +25,16 @@ import ru.arzimurotov.hotel.domain.*
 /** Локальная HorizontalPager-галерея; тап передаёт индекс для полноэкранного просмотра. */
 @Composable
 fun PhotoGallery(hotel: Hotel, onFull: (Int) -> Unit) {
-    val pager = rememberPagerState(pageCount = { hotel.photos.size })
+    val count = (hotel.photoFiles.size + hotel.photos.size).coerceAtLeast(1)
+    val pager = rememberPagerState(pageCount = { count })
     Box {
         HorizontalPager(pager, Modifier.fillMaxWidth().height(260.dp).testTag("hotel_gallery")) {
             page ->
             TravelPhoto(
-                hotel.photos[page],
+                hotel.photos.getOrNull(page - hotel.photoFiles.size) ?: Photo.EXTERIOR,
                 Modifier.fillMaxSize().clickable { onFull(page) },
-                "Учебная иллюстрация ${page+1} из ${hotel.photos.size}. Открыть галерею",
+                "Фото ${page+1} из $count. Открыть галерею",
+                fileName = hotel.photoFiles.getOrNull(page),
             )
         }
         Surface(
@@ -41,7 +43,7 @@ fun PhotoGallery(hotel: Hotel, onFull: (Int) -> Unit) {
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         ) {
             Text(
-                "${pager.currentPage+1} / ${hotel.photos.size}",
+                "${pager.currentPage+1} / $count",
                 color = Color.White,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.labelLarge,
@@ -67,10 +69,10 @@ fun HotelDetailScreen(
     onGallery: (Int) -> Unit,
     onRoom: (RoomKind) -> Unit,
     onPlace: (String) -> Unit,
-    live:Boolean=false,
-    checking:Boolean=false,
-    availabilityError:String?=null,
-    onRetry:()->Unit={},
+    live: Boolean = false,
+    checking: Boolean = false,
+    availabilityError: String? = null,
+    onRetry: () -> Unit = {},
 ) {
     val currency = catalog.country(catalog.city(hotel.cityId).countryId).currency
     Column(Modifier.fillMaxSize().testTag("hotel_detail")) {
@@ -90,6 +92,23 @@ fun HotelDetailScreen(
                 ) {
                     Stars(hotel.stars)
                     SectionTitle(hotel.name, "${hotel.address} · учебный адрес")
+                    if (hotel.latitude != null && hotel.longitude != null) {
+                        Text(
+                            "Демо-координаты: ${hotel.latitude}, ${hotel.longitude}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (
+                            !Geo.hasMapCoverage(
+                                catalog.city(hotel.cityId).legacyId,
+                                hotel.latitude,
+                                hotel.longitude,
+                            )
+                        )
+                            Text(
+                                "Объект вне встроенного района карты. Описание доступно offline.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -117,26 +136,27 @@ fun HotelDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        hotel.amenities.forEach { amenity ->
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color.White,
-                                border =
-                                    androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        Color(0xFFDFE5EC),
-                                    ),
-                            ) {
-                                Row(
-                                    Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        (hotel.amenityLabels.ifEmpty { hotel.amenities.map { it.title } })
+                            .forEach { amenity ->
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color.White,
+                                    border =
+                                        androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            Color(0xFFDFE5EC),
+                                        ),
                                 ) {
-                                    TravelIcon(Glyph.CHECK, Modifier.size(14.dp), TravelGreen)
-                                    Text(amenity.title, style = MaterialTheme.typography.bodySmall)
+                                    Row(
+                                        Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        TravelIcon(Glyph.CHECK, Modifier.size(14.dp), TravelGreen)
+                                        Text(amenity, style = MaterialTheme.typography.bodySmall)
+                                    }
                                 }
                             }
-                        }
                     }
                     Text(
                         "Перечень описывает возможности гостиницы. Завтрак и другие услуги не включены в базовую цену номера.",
@@ -145,12 +165,18 @@ fun HotelDetailScreen(
                     )
                     SectionTitle("Номера", "${dateLabel(query)} · ${guestLabel(query)}")
                     DemoNote(
-                        if(live) "Доступность на выбранные даты проверяется сервером. Заказ ещё не создан."
-                        else "Выберите тип для предварительного расчёта. Наличие и бронирование будут проверяться сервером на следующем этапе."
+                        if (live)
+                            "Доступность на выбранные даты проверяется системой. Заказ ещё не создан."
+                        else
+                            "Выберите тип для предварительного расчёта. Наличие и бронирование будут проверяться сервером на следующем этапе."
                     )
-                    if(checking) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    availabilityError?.let {Text(it,color=MaterialTheme.colorScheme.error);TextButton(onRetry) {Text("Повторить")}}
-                    if(live && !checking && hotel.rooms.isEmpty() && availabilityError==null) Text("На эти даты нет подходящих свободных номеров.")
+                    if (checking) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    availabilityError?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                        TextButton(onRetry) { Text("Повторить") }
+                    }
+                    if (live && !checking && hotel.rooms.isEmpty() && availabilityError == null)
+                        Text("На эти даты нет подходящих свободных номеров.")
                 }
             }
             items(hotel.rooms, key = { it.kind.name }) { room ->
@@ -194,7 +220,7 @@ fun HotelDetailScreen(
                                 modifier = Modifier.testTag("room_${room.kind.name}"),
                                 shape = RoundedCornerShape(10.dp),
                             ) {
-                                Text(if(live) "Выбрать и оформить" else "Рассчитать")
+                                Text(if (live) "Выбрать и оформить" else "Рассчитать")
                             }
                             if (room.capacity < query.guestsPerRoom)
                                 Text(
@@ -226,13 +252,43 @@ fun HotelDetailScreen(
                         )
                         HorizontalDivider()
                     }
-                    SectionTitle("В этом городе", "Подборка учебных мест — не данные карты")
+                    SectionTitle(
+                        "Рядом с гостиницей",
+                        "Демонстрационные координаты; расстояние по прямой",
+                    )
                 }
             }
-            items(catalog.places.filter { it.cityId == hotel.cityId }.take(3), key = { it.id }) {
-                place ->
+            items(
+                catalog.places.filter {
+                    it.cityId == hotel.cityId &&
+                        (hotel.nearbyPlaceIds == null || it.id in hotel.nearbyPlaceIds)
+                },
+                key = { it.id },
+            ) { place ->
                 Box(Modifier.padding(horizontal = 20.dp)) {
-                    PlaceCard(place, catalog.city(place.cityId).name) { onPlace(place.id) }
+                    Column {
+                        PlaceCard(place, catalog.city(place.cityId).name) { onPlace(place.id) }
+                        if (
+                            hotel.latitude != null &&
+                                hotel.longitude != null &&
+                                place.latitude != null &&
+                                place.longitude != null
+                        )
+                            Text(
+                                "По прямой: " +
+                                    String.format(
+                                        Russian,
+                                        "%.2f км",
+                                        Geo.distanceKm(
+                                            hotel.latitude,
+                                            hotel.longitude,
+                                            place.latitude,
+                                            place.longitude,
+                                        ),
+                                    ),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                    }
                 }
             }
         }
@@ -242,33 +298,29 @@ fun HotelDetailScreen(
 /** Полноэкранные оригинальные иллюстрации с ContentScale.Fit, без обрезки изображения. */
 @Composable
 fun GalleryScreen(hotel: Hotel, initialPage: Int, onBack: () -> Unit) {
+    val count = (hotel.photoFiles.size + hotel.photos.size).coerceAtLeast(1)
     val pager =
         rememberPagerState(
-            initialPage = initialPage.coerceIn(hotel.photos.indices),
-            pageCount = { hotel.photos.size },
+            initialPage = initialPage.coerceIn(0 until count),
+            pageCount = { count },
         )
     Column(Modifier.fillMaxSize().background(TravelNavy).testTag("gallery_screen")) {
         ScreenHeader(
             "Фотогалерея",
-            "${hotel.name} · ${pager.currentPage+1} / ${hotel.photos.size}",
+            "${hotel.name} · ${pager.currentPage+1} / $count",
             onBack,
         )
         HorizontalPager(pager, Modifier.weight(1f).testTag("full_gallery")) { page ->
-            androidx.compose.foundation.Image(
-                androidx.compose.ui.res.painterResource(
-                    when (hotel.photos[page]) {
-                        Photo.EXTERIOR -> ru.arzimurotov.hotel.R.drawable.hotel_exterior
-                        Photo.ROOM -> ru.arzimurotov.hotel.R.drawable.hotel_room
-                        Photo.POOL -> ru.arzimurotov.hotel.R.drawable.hotel_pool
-                    }
-                ),
-                "Учебная иллюстрация ${page+1}",
+            TravelPhoto(
+                hotel.photos.getOrNull(page - hotel.photoFiles.size) ?: Photo.EXTERIOR,
                 Modifier.fillMaxSize(),
-                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                "Фото ${page+1}",
+                fileName = hotel.photoFiles.getOrNull(page),
+                scale = androidx.compose.ui.layout.ContentScale.Fit,
             )
         }
         Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.Center) {
-            hotel.photos.indices.forEach { i ->
+            (0 until count).forEach { i ->
                 Box(
                     Modifier.padding(4.dp)
                         .size(if (i == pager.currentPage) 10.dp else 8.dp)
@@ -422,7 +474,7 @@ fun QuoteScreen(
 
 /** Описание вымышленного места; не выдаёт билет и не обещает реальную услугу. */
 @Composable
-fun PlaceDetailScreen(place: Place, onBack: () -> Unit) {
+fun PlaceDetailScreen(place: Place, onBack: () -> Unit, cityKey: String? = null) {
     Column(Modifier.fillMaxSize().testTag("place_detail")) {
         ScreenHeader(place.category.title, "Учебный городской каталог", onBack)
         LazyColumn(
@@ -435,6 +487,7 @@ fun PlaceDetailScreen(place: Place, onBack: () -> Unit) {
                     place.photo,
                     Modifier.fillMaxWidth().height(250.dp),
                     "Иллюстрация, не фотография реального места",
+                    fileName = place.photoFile,
                 )
             }
             item {
@@ -444,12 +497,23 @@ fun PlaceDetailScreen(place: Place, onBack: () -> Unit) {
                 ) {
                     SectionTitle(place.name, place.address)
                     Text(place.description)
+                    if (place.latitude != null && place.longitude != null) {
+                        Text(
+                            "Демо-координаты: ${place.latitude}, ${place.longitude}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (!Geo.hasMapCoverage(cityKey, place.latitude, place.longitude))
+                            Text(
+                                "Для этих координат нет встроенного покрытия. Список и описание доступны без карты.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                    }
                     DemoNote(
                         "Изображение служит иллюстрацией. Часы работы, маршруты и координаты реальных объектов здесь не представлены."
                     )
                     SectionTitle("Планирование без спешки")
                     Text(
-                        "Раздел помогает представить будущий городской каталог. Карта и связь с гостиницами появятся при подключении серверных данных. Рестораны останутся информационными объектами; демобилеты для музеев и мероприятий будут отдельным модулем.",
+                        "Места и их демонстрационные координаты доступны в списке и на встроенной offline-карте центральных районов. Рестораны — информационные объекты; билеты для музеев и мероприятий в эту версию не входят.",
                         color = TravelMuted,
                         style = MaterialTheme.typography.bodyMedium,
                     )

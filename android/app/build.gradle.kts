@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -13,15 +15,29 @@ android {
         applicationId = "ru.arzimurotov.hotel"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 9
+        versionName = "0.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    // Приватный ключ не попадает в Git. Debug Run работает на Mac/Windows без него.
+    // Отдельный release package позволяет сохранить существующую debug-установку и её данные.
+    val privateSigningFile = rootProject.file("../.local/signing.properties")
+    val privateSigning = Properties().apply {
+        if(privateSigningFile.exists())privateSigningFile.inputStream().use {load(it)}
+    }
+    if(privateSigningFile.exists())signingConfigs.create("distribution") {
+        storeFile=rootProject.file("../.local/"+privateSigning.getProperty("storeFile"))
+        storePassword=privateSigning.getProperty("storePassword")
+        keyAlias=privateSigning.getProperty("keyAlias")
+        keyPassword=privateSigning.getProperty("keyPassword")
     }
     buildTypes {
         debug {
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080/\"")
         }
         release {
+            applicationIdSuffix = ".offline"
+            if(privateSigningFile.exists())signingConfig=signingConfigs.getByName("distribution")
             buildConfigField("String", "API_BASE_URL", "\"https://hotel.invalid/\"")
             isMinifyEnabled = false
         }
@@ -38,6 +54,13 @@ android {
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+    implementation(libs.mapsforge.android)
+    implementation(libs.mapsforge.reader)
+    implementation(libs.mapsforge.themes)
+    implementation("org.bouncycastle:bcprov-jdk18on:1.86")
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
@@ -65,3 +88,4 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 }
+ksp { arg("room.schemaLocation", "$projectDir/schemas") }

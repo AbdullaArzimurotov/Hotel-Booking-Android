@@ -1,4 +1,44 @@
-# SQL-модель этапов 3–6, версия 0.6.0
+# SQL-модели: SQLite 0.9.0 и сохранённый PostgreSQL 0.6.0
+
+## Рабочая база APK: Room/SQLite
+
+Room schema v1 экспортирована в `android/app/schemas`. Money — INTEGER/Long в минимальных
+единицах; UUID — TEXT. `catalog_entries` хранит отдельные JSON-записи стран, городов,
+гостиниц, мест, удобств и metadata, не один монолитный каталог. Родительские связи
+справочников валидирует LocalAdmin; они не объявлены SQL FOREIGN KEY.
+Объекты типов/комнат/тарифов/услуг/блокировок/заказов/оплат имеют отдельные таблицы.
+`bookings.payload` содержит неизменяемый snapshot цен, клиента, номера и услуг.
+`hotel_places` — общие места города с M:N связями, не копии ресторана для каждого отеля.
+
+Физические FK: rooms → room_types; rates → room_types; room_blocks → rooms;
+booking_rooms → bookings/rooms, ON DELETE RESTRICT. Прочие связи логические и проверяются
+в бизнес-транзакциях. Уникальные индексы защищают email, owner/idempotencyKey,
+платёж для заказа, allocation booking/room и hotel/place. Повторное сохранение — @Upsert,
+не INSERT OR REPLACE с удалением связанных строк.
+
+```mermaid
+flowchart TD
+  UI[Compose] --> Engine[LocalEngine / LocalAdmin]
+  Engine --> C[catalog_entries: JSON-справочники]
+  Engine --> U[local_users: Argon2 / recovery hash]
+  Engine --> T[room_types]
+  R[rooms] -->|FK| T
+  Rate[rates] -->|FK| T
+  Block[room_blocks] -->|FK| R
+  Engine --> B[bookings: snapshot]
+  BR[booking_rooms] -->|FK| B
+  BR -->|FK| R
+  Engine --> S[hotel_services / hotel_places]
+  Engine --> P[payments / receipts]
+  Engine --> A[audit]
+```
+
+Seed выполняется атомарно один раз. APK обновляется без destructive migration.
+Истёкшие резервы игнорируются при подсчёте наличия; состояние обновляется при обращении
+к базе. Устройство не использует серверное время. Логические и физические модели
+не следует смешивать при защите курсовой работы.
+
+## Архив SQL-модели этапов 3–6, версия 0.6.0
 
 V1__foundation.sql (app_metadata) сохранена без изменения. V2__catalog_and_accounts.sql
 добавляет новые таблицы, не пересоздаёт основную базу. PK UUID, FK, CHECK, UNIQUE и индексы.

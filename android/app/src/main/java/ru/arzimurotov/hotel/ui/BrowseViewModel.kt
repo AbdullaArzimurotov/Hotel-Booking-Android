@@ -54,7 +54,8 @@ constructor(private val repository: CatalogRepository, private val saved: SavedS
         if (loadJob?.isActive == true) return
         loadJob =
             viewModelScope.launch {
-                mutableState.update { it.copy(loading = true, error = false) }
+                // Обновление каталога после ADMIN CRUD не уничтожает текущую навигацию.
+                mutableState.update { it.copy(loading = it.catalog == null, error = false) }
                 try {
                     val catalog = repository.load()
                     val current=state.value.query

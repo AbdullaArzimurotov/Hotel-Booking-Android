@@ -132,3 +132,25 @@ Places — общие городские объекты; hotel_places не ра�
 [Bouncy Castle 1.86](https://www.bouncycastle.org/resources/new-release-bouncy-castle-java-1-86/),
 [Android Keystore](https://developer.android.com/privacy-and-security/keystore),
 [AndroidX Test](https://developer.android.com/jetpack/androidx/releases/test).
+# Самостоятельная архитектура 0.9.0
+
+`android/app/src/main/java/ru/arzimurotov/hotel/data/local`:
+
+- LocalDatabase — Room entities, DAO, индексы, FK и schema v1.
+- LocalEngine — seed, сессия, каталог, поиск, атомарное распределение комнат,
+  idempotency, снимки, резерв, демооплата и отмена.
+- LocalAdmin — ADMIN guard, формы справочников, валидация, optimistic version,
+  архивирование, фото/порядок, аудит.
+- LocalSecurity — Argon2id и индивидуальные recovery-коды.
+- LocalMedia — ограниченный импорт выбранного изображения в private storage.
+- ConfirmationHtml — локальный экранированный HTML без сети.
+
+`ui`: существующие ViewModel/StateFlow, LocalAdminScreen, OfflineAccountScreens,
+OfflineMapScreen (Mapsforge Native View + Compose), OfflineConfirmation (WebView,
+SAF/FileProvider/email Intent). Hilt связывает production с локальными репозиториями.
+`shared/domain` сохраняет контракты, SearchRules/BookingRules, модели и Geo.
+`assets/maps` — 6 векторных `.map`, manifest/source/license; `docs/maps-source` — исходные OSM.
+`androidTest` — Compose и реальные SQLite-тесты, без обращения к персональному телефону.
+`server` — сохранённый Ktor/PostgreSQL 0.6.0, не стартует внутри APK.
+
+## Архив структуры server/API этапов 1–6

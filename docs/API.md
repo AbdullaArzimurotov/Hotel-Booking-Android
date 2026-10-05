@@ -127,3 +127,14 @@ IDEMPOTENCY_CONFLICT, PAYMENT_NOT_ALLOWED, RESERVATION_EXPIRED, CANCELLATION_CLO
 
 Полный /admin CRUD, Google Maps и Room отсутствуют. История SQL не удаляется через API.
 Реальные услуги/платежи/фискализация/билеты/такси/аренда авто не реализованы.
+# Текущая версия 0.9.0: локальные контракты
+
+Самостоятельный APK не вызывает эти HTTP-маршруты. Hilt предоставляет
+LocalAuthRepository / LocalCatalogRepository / LocalTravelRepository;
+контракты DTO Domain сохранены для совместимости с историческим backend.
+Поиск, создание/отмена заказа, демооплата и HTML-документ выполняются LocalEngine
+в транзакциях Room. LocalAdmin проверяет ADMIN и выполняет CRUD/архивирование.
+Авторизация локальная: защищённый session token с версией пользователя; это не JWT.
+Смена/сброс пароля инвалидирует предыдущую версию сеанса. Email-передача — Android Intent.
+
+## Архив HTTP API 0.6.0 (Ktor/PostgreSQL)

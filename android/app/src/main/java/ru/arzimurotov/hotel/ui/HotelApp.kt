@@ -31,8 +31,8 @@ private val tabs =
  * приходит из Activity, события уходят callbacks в ViewModel (однонаправленный поток).
  * Загрузка/ошибка обрабатываются до создания графа. Параметры маршрутов — стабильные id, а не
  * сериализованные Hotel: объект повторно находится в актуальном Catalog. От 720 dp используется
- * NavigationRail; на телефоне — нижняя панель главных вкладок. Рабочий каталог, аккаунты,
- * поиск и заказы используют настоящие API; test-only callbacks позволяют изолировать UI-тесты.
+ * NavigationRail; на телефоне — нижняя панель главных вкладок. Рабочий каталог, аккаунты, поиск и
+ * заказы используют настоящие API; test-only callbacks позволяют изолировать UI-тесты.
  */
 @Composable
 fun HotelApp(
@@ -43,36 +43,69 @@ fun HotelApp(
     health: FoundationState,
     onHealthRefresh: () -> Unit,
     auth: AuthState = AuthState(),
-    onLogin: (String,String)->Unit = { _,_ -> },
-    onRegister: (String,String,String,String,String)->Unit = { _,_,_,_,_ -> },
-    onUpdateProfile: (String,String)->Unit = { _,_ -> },
-    onLogout: ()->Unit = {},
-    onAuthRefresh: ()->Unit = {},
-    onAdminSummary: ()->Unit = {},
+    onLogin: (String, String) -> Unit = { _, _ -> },
+    onRegister: (String, String, String, String, String) -> Unit = { _, _, _, _, _ -> },
+    onUpdateProfile: (String, String) -> Unit = { _, _ -> },
+    onLogout: () -> Unit = {},
+    onAuthRefresh: () -> Unit = {},
+    onAdminSummary: () -> Unit = {},
     isUsb: Boolean = false,
-    onConnection: (Boolean)->Unit = {},
-    travel:TravelState? = null,
-    onSearch:(SearchQuery,Boolean)->Unit = {_,_->},
-    onAvailability:(String,SearchQuery)->Unit = {_,_->},
-    onCreate:(CreateBooking)->Unit = {},
-    onLoadBookings:(Boolean)->Unit = {},
-    onPay:(String)->Unit = {},
-    onCancel:(String)->Unit = {},
-    onBookingRefresh:(String)->Unit = {},
-    onReceipt:(String)->Unit = {},
-    onPdfConsumed:()->Unit = {},
-    onCreatedConsumed:()->Unit = {},
+    onConnection: (Boolean) -> Unit = {},
+    travel: TravelState? = null,
+    onSearch: (SearchQuery, Boolean) -> Unit = { _, _ -> },
+    onAvailability: (String, SearchQuery) -> Unit = { _, _ -> },
+    onCreate: (CreateBooking) -> Unit = {},
+    onLoadBookings: (Boolean) -> Unit = {},
+    onPay: (String) -> Unit = {},
+    onCancel: (String) -> Unit = {},
+    onBookingRefresh: (String) -> Unit = {},
+    onReceipt: (String) -> Unit = {},
+    onPdfConsumed: () -> Unit = {},
+    onCreatedConsumed: () -> Unit = {},
+    standalone: Boolean = false,
+    adminContent: (@Composable ((() -> Unit), () -> Unit) -> Unit)? = null,
+    onChangePassword: (String, String, String) -> Unit = { _, _, _ -> },
+    onResetPassword: (String, String, String, String) -> Unit = { _, _, _, _ -> },
+    onRecoveryConsumed: () -> Unit = {},
 ) {
-    var connectionDialog by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    if(connectionDialog && ru.arzimurotov.hotel.BuildConfig.DEBUG) AlertDialog(
-        onDismissRequest={connectionDialog=false},title={Text("Подключение к серверу")},
-        text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text("Запустите scripts/dev.py server. Для телефона также выполните scripts/dev.py usb.")
-            OutlinedButton({onConnection(false);connectionDialog=false},Modifier.fillMaxWidth().testTag("connection_emulator")) { Text("Эмулятор · 10.0.2.2:8080") }
-            OutlinedButton({onConnection(true);connectionDialog=false},Modifier.fillMaxWidth().testTag("connection_usb")) { Text("Телефон USB · 127.0.0.1:8080") }
-            Text("Сейчас: "+if(isUsb) "USB" else "эмулятор")
-            Text("При смене сервера аккаунт выйдет из системы. Каталог будет загружен заново.")
-        }},confirmButton={TextButton({connectionDialog=false}) {Text("Закрыть")}})
+    auth.recoveryCode?.let { RecoveryNotice(it, onRecoveryConsumed) }
+    var connectionDialog by
+        androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    if (connectionDialog && ru.arzimurotov.hotel.BuildConfig.DEBUG)
+        AlertDialog(
+            onDismissRequest = { connectionDialog = false },
+            title = { Text("Подключение к серверу") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Запустите scripts/dev.py server. Для телефона также выполните scripts/dev.py usb."
+                    )
+                    OutlinedButton(
+                        {
+                            onConnection(false)
+                            connectionDialog = false
+                        },
+                        Modifier.fillMaxWidth().testTag("connection_emulator"),
+                    ) {
+                        Text("Эмулятор · 10.0.2.2:8080")
+                    }
+                    OutlinedButton(
+                        {
+                            onConnection(true)
+                            connectionDialog = false
+                        },
+                        Modifier.fillMaxWidth().testTag("connection_usb"),
+                    ) {
+                        Text("Телефон USB · 127.0.0.1:8080")
+                    }
+                    Text("Сейчас: " + if (isUsb) "USB" else "эмулятор")
+                    Text(
+                        "При смене сервера аккаунт выйдет из системы. Каталог будет загружен заново."
+                    )
+                }
+            },
+            confirmButton = { TextButton({ connectionDialog = false }) { Text("Закрыть") } },
+        )
     Surface(
         Modifier.fillMaxSize().background(TravelNavy).statusBarsPadding(),
         color = TravelBackground,
@@ -96,11 +129,19 @@ fun HotelApp(
                     ScreenHeader("Гостиница")
                     EmptyPanel(
                         "Каталог не загрузился",
-                        "Сервер недоступен. Проверьте запуск backend и выберите подключение.",
+                        if (standalone)
+                            "Не удалось открыть локальную SQL-базу. Повторите запуск; данные не будут удалены."
+                        else "Сервер недоступен. Проверьте запуск backend и выберите подключение.",
                         actionLabel = "Повторить",
                         onAction = onReload,
                     )
-                    if(ru.arzimurotov.hotel.BuildConfig.DEBUG) TextButton({connectionDialog=true},Modifier.fillMaxWidth().testTag("connection_settings")) { Text("Настроить подключение") }
+                    if (!standalone && ru.arzimurotov.hotel.BuildConfig.DEBUG)
+                        TextButton(
+                            { connectionDialog = true },
+                            Modifier.fillMaxWidth().testTag("connection_settings"),
+                        ) {
+                            Text("Настроить подключение")
+                        }
                 }
             else -> {
                 val catalog = state.catalog
@@ -122,7 +163,9 @@ fun HotelApp(
                     nav.navigate(routeName) {
                         popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                         launchSingleTop = true
-                        restoreState = true
+                        // «Поиск» всегда открывает форму, а не сохранённый checkout прошлой брони.
+                        // Сам запрос сохраняется ViewModel, поэтому параметры поездки не теряются.
+                        restoreState = routeName != "search"
                     }
                 }
                 fun hotel(id: String) {
@@ -146,7 +189,11 @@ fun HotelApp(
                     if (!nav.popBackStack()) tab("search")
                 }
                 LaunchedEffect(travel?.created?.id) {
-                    if(travel?.created!=null) {orderFocus=travel.created.id;onCreatedConsumed();tab("bookings")}
+                    if (travel?.created != null) {
+                        orderFocus = travel.created.id
+                        onCreatedConsumed()
+                        tab("bookings")
+                    }
                 }
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val wide = maxWidth >= 720.dp
@@ -176,12 +223,22 @@ fun HotelApp(
                                 }
                             }
                         Column(Modifier.weight(1f).fillMaxHeight()) {
-                            if(state.error) Surface(color=MaterialTheme.colorScheme.secondaryContainer) {
-                                Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
-                                    Text("Нет связи. Показаны ранее загруженные данные.",Modifier.weight(1f),style=MaterialTheme.typography.bodySmall)
-                                    TextButton(onReload) {Text("Повторить")}
+                            if (state.error)
+                                Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
+                                    Row(
+                                        Modifier.fillMaxWidth().padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            if (standalone)
+                                                "Не удалось обновить SQL-каталог. Показаны ранее прочитанные данные."
+                                            else "Нет связи. Показаны ранее загруженные данные.",
+                                            Modifier.weight(1f),
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                        TextButton(onReload) { Text("Повторить") }
+                                    }
                                 }
-                            }
                             Box(
                                 Modifier.weight(1f)
                                     .fillMaxWidth()
@@ -207,7 +264,9 @@ fun HotelApp(
                                         )
                                     }
                                     composable("results") {
-                                        LaunchedEffect(state.query) {if(travel!=null)onSearch(state.query,false)}
+                                        LaunchedEffect(state.query) {
+                                            if (travel != null) onSearch(state.query, false)
+                                        }
                                         ResultsScreen(
                                             state,
                                             wide,
@@ -215,9 +274,9 @@ fun HotelApp(
                                             ::back,
                                             ::hotel,
                                             onFavorite,
-                                            server=travel,
-                                            onMore={onSearch(state.query,true)},
-                                            onRetry={onSearch(state.query,false)},
+                                            server = travel,
+                                            onMore = { onSearch(state.query, true) },
+                                            onRetry = { onSearch(state.query, false) },
                                         )
                                     }
                                     composable("favorites") {
@@ -232,32 +291,141 @@ fun HotelApp(
                                         )
                                     }
                                     composable("places") {
-                                        PlacesScreen(catalog, state.query, wide, onQuery) {
-                                            nav.navigate("place/$it")
+                                        Column {
+                                            if (standalone)
+                                                OutlinedButton(
+                                                    { nav.navigate("map") },
+                                                    Modifier.fillMaxWidth().testTag("open_map"),
+                                                ) {
+                                                    Text("Открыть offline-карту")
+                                                }
+                                            PlacesScreen(catalog, state.query, wide, onQuery) {
+                                                nav.navigate("place/$it")
+                                            }
                                         }
                                     }
+                                    composable("map") {
+                                        OfflineMapScreen(
+                                            catalog,
+                                            state.query,
+                                            ::back,
+                                            { nav.navigate("place/$it") },
+                                            ::hotel,
+                                        )
+                                    }
                                     composable("bookings") {
-                                        if(travel==null) BookingsScreen {tab("search")}
-                                        else OrdersScreen(auth,travel,{nav.navigate("auth")},{tab("search")},onLoadBookings,onPay,onCancel,onBookingRefresh,onReceipt,onPdfConsumed,orderFocus)
+                                        if (travel == null) BookingsScreen { tab("search") }
+                                        else
+                                            OrdersScreen(
+                                                auth,
+                                                travel,
+                                                { nav.navigate("auth") },
+                                                { tab("search") },
+                                                onLoadBookings,
+                                                onPay,
+                                                onCancel,
+                                                onBookingRefresh,
+                                                onReceipt,
+                                                onPdfConsumed,
+                                                orderFocus,
+                                                standalone,
+                                            )
                                     }
                                     composable("profile") {
-                                        AccountProfile(auth,state.favorites.size,{nav.navigate("favorites")},{nav.navigate("system")},
-                                            {nav.navigate("auth")},onUpdateProfile,onLogout,onAuthRefresh,
-                                            {onAdminSummary();nav.navigate("admin")},{connectionDialog=true})
+                                        AccountProfile(
+                                            auth,
+                                            state.favorites.size,
+                                            { nav.navigate("favorites") },
+                                            { nav.navigate("system") },
+                                            { nav.navigate("auth") },
+                                            onUpdateProfile,
+                                            onLogout,
+                                            onAuthRefresh,
+                                            {
+                                                onAdminSummary()
+                                                nav.navigate("admin")
+                                            },
+                                            { connectionDialog = true },
+                                            standalone,
+                                            { nav.navigate("password") },
+                                        )
                                     }
                                     composable("auth") {
-                                        LaunchedEffect(auth.user?.id) { if(auth.user!=null) nav.popBackStack() }
-                                        AuthForm(auth,onLogin,onRegister,::back)
+                                        LaunchedEffect(auth.user?.id) {
+                                            if (auth.user != null) nav.popBackStack()
+                                        }
+                                        AuthForm(
+                                            auth,
+                                            onLogin,
+                                            onRegister,
+                                            ::back,
+                                            standalone,
+                                            { nav.navigate("reset-password") },
+                                        )
+                                    }
+                                    composable("password") {
+                                        PasswordScreen(
+                                            auth,
+                                            false,
+                                            ::back,
+                                            onChangePassword,
+                                            onResetPassword,
+                                        )
+                                    }
+                                    composable("reset-password") {
+                                        PasswordScreen(
+                                            auth,
+                                            true,
+                                            ::back,
+                                            onChangePassword,
+                                            onResetPassword,
+                                        )
                                     }
                                     composable("admin") {
-                                        if(auth.user?.role=="ADMIN") AdminScreen(auth,::back,onAdminSummary)
-                                        else EmptyPanel("Доступ закрыт","Войдите как администратор.",actionLabel="Назад",onAction=::back)
+                                        if (auth.user?.role == "ADMIN") {
+                                            if (adminContent != null) adminContent(::back, onReload)
+                                            else AdminScreen(auth, ::back, onAdminSummary)
+                                        } else
+                                            EmptyPanel(
+                                                "Доступ закрыт",
+                                                "Войдите как администратор.",
+                                                actionLabel = "Назад",
+                                                onAction = ::back,
+                                            )
                                     }
                                     composable("system") {
                                         Column {
                                             ScreenHeader("Диагностика платформы", onBack = ::back)
-                                            if(ru.arzimurotov.hotel.BuildConfig.DEBUG) TextButton({connectionDialog=true},Modifier.testTag("connection_settings")) {Text("Эмулятор / USB")}
-                                            FoundationScreen(health, onHealthRefresh)
+                                            if (standalone)
+                                                Column(
+                                                    Modifier.padding(20.dp),
+                                                    verticalArrangement =
+                                                        Arrangement.spacedBy(12.dp),
+                                                ) {
+                                                    SectionTitle(
+                                                        "Самостоятельная демонстрация",
+                                                        "Room / SQLite · 0.9.0",
+                                                    )
+                                                    Text(
+                                                        "Ни сеть, ни backend не нужны. Данные остаются на этом телефоне. Между устройствами они не синхронизируются."
+                                                    )
+                                                    Text(
+                                                        "3 страны · 6 городов · 36 гостиниц в исходном каталоге. Offline-карты включены в APK."
+                                                    )
+                                                    DemoNote(
+                                                        "Демо-оплата, без списания денег. Отправка письма выполняется вашим почтовым приложением при наличии интернета."
+                                                    )
+                                                }
+                                            else {
+                                                if (ru.arzimurotov.hotel.BuildConfig.DEBUG)
+                                                    TextButton(
+                                                        { connectionDialog = true },
+                                                        Modifier.testTag("connection_settings"),
+                                                    ) {
+                                                        Text("Эмулятор / USB")
+                                                    }
+                                                FoundationScreen(health, onHealthRefresh)
+                                            }
                                         }
                                     }
                                     composable(
@@ -267,7 +435,10 @@ fun HotelApp(
                                     ) { e ->
                                         val id = e.arguments?.getString("id").orEmpty()
                                         val h = catalog.hotel(id)
-                                        LaunchedEffect(id,state.query) {if(travel!=null && h!=null)onAvailability(id,state.query)}
+                                        LaunchedEffect(id, state.query) {
+                                            if (travel != null && h != null)
+                                                onAvailability(id, state.query)
+                                        }
                                         if (h == null)
                                             EmptyPanel(
                                                 "Гостиница не найдена",
@@ -278,7 +449,23 @@ fun HotelApp(
                                         else
                                             HotelDetailScreen(
                                                 catalog,
-                                                if(travel==null) h else h.copy(rooms=travel.availability?.takeIf {it.hotelId==id}?.offers.orEmpty().map {RoomOffer(RoomKind.valueOf(it.kind),it.capacity,it.area,it.nightlyPrice)}),
+                                                if (travel == null) h
+                                                else
+                                                    h.copy(
+                                                        rooms =
+                                                            travel.availability
+                                                                ?.takeIf { it.hotelId == id }
+                                                                ?.offers
+                                                                .orEmpty()
+                                                                .map {
+                                                                    RoomOffer(
+                                                                        RoomKind.valueOf(it.kind),
+                                                                        it.capacity,
+                                                                        it.area,
+                                                                        it.nightlyPrice,
+                                                                    )
+                                                                }
+                                                    ),
                                                 state.query,
                                                 id in state.favorites,
                                                 { onFavorite(id) },
@@ -286,10 +473,10 @@ fun HotelApp(
                                                 { nav.navigate("gallery/$id/$it") },
                                                 { nav.navigate("quote/$id/${it.name}") },
                                                 { nav.navigate("place/$it") },
-                                                live=travel!=null,
-                                                checking=travel?.checking ?: false,
-                                                availabilityError=travel?.availabilityError,
-                                                onRetry={onAvailability(id,state.query)},
+                                                live = travel != null,
+                                                checking = travel?.checking ?: false,
+                                                availabilityError = travel?.availabilityError,
+                                                onRetry = { onAvailability(id, state.query) },
                                             )
                                     }
                                     composable(
@@ -322,7 +509,19 @@ fun HotelApp(
                                             h?.rooms?.find {
                                                 it.kind.name == e.arguments?.getString("kind")
                                             }
-                                        if(h!=null && travel!=null) CheckoutScreen(catalog,h,state.query,e.arguments?.getString("kind").orEmpty(),travel,auth,::back,{nav.navigate("auth")},{onAvailability(h.id,state.query)},onCreate)
+                                        if (h != null && travel != null)
+                                            CheckoutScreen(
+                                                catalog,
+                                                h,
+                                                state.query,
+                                                e.arguments?.getString("kind").orEmpty(),
+                                                travel,
+                                                auth,
+                                                ::back,
+                                                { nav.navigate("auth") },
+                                                { onAvailability(h.id, state.query) },
+                                                onCreate,
+                                            )
                                         else if (h != null && room != null)
                                             QuoteScreen(catalog, h, room, state.query, ::back)
                                     }
@@ -333,7 +532,13 @@ fun HotelApp(
                                     ) { e ->
                                         catalog.places
                                             .find { it.id == e.arguments?.getString("id") }
-                                            ?.let { PlaceDetailScreen(it, ::back) }
+                                            ?.let {
+                                                PlaceDetailScreen(
+                                                    it,
+                                                    ::back,
+                                                    catalog.city(it.cityId).legacyId,
+                                                )
+                                            }
                                     }
                                 }
                             }

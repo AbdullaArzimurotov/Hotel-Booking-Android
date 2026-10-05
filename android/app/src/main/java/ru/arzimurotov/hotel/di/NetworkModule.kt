@@ -11,28 +11,66 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
-import ru.arzimurotov.hotel.BuildConfig
-import ru.arzimurotov.hotel.data.RemoteHealthRepository
 import ru.arzimurotov.hotel.domain.HealthRepository
 
 /**
- * Composition root связывает контракты с API-репозиториями каталога, аккаунта и заказов.
- * В рабочем приложении нет подмены SQL локальным demo-каталогом. SingletonComponent сохраняет
- * один Ktor Client на приложение; ключи и персональные ответы не попадают в сетевые логи.
+ * Composition root версии 0.9.0 связывает контракты с самостоятельной Room/SQLite системой. Ktor
+ * сохранён для старой серверной реализации, но production repositories его не вызывают. Никакого
+ * скрытого fallback или автоматической синхронизации с backend нет.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-    @Provides @Singleton
-    fun travelRepository(r:ru.arzimurotov.hotel.data.RemoteTravelRepository):ru.arzimurotov.hotel.data.TravelRepository=r
     @Provides
     @Singleton
-    fun catalogRepository(client: HttpClient, connection: ru.arzimurotov.hotel.data.ApiConnection): ru.arzimurotov.hotel.domain.CatalogRepository =
-        ru.arzimurotov.hotel.data.RemoteCatalogRepository(client,connection)
+    fun database(
+        @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context
+    ): ru.arzimurotov.hotel.data.local.LocalDatabase =
+        androidx.room.Room.databaseBuilder(
+                context,
+                ru.arzimurotov.hotel.data.local.LocalDatabase::class.java,
+                "hotel_offline_09.db",
+            )
+            .build()
 
-    @Provides @Singleton
-    fun authRepository(client: HttpClient, connection: ru.arzimurotov.hotel.data.ApiConnection, session: ru.arzimurotov.hotel.data.SessionStore): ru.arzimurotov.hotel.data.AuthRepository =
-        ru.arzimurotov.hotel.data.RemoteAuthRepository(client,connection,session)
+    @Provides
+    @Singleton
+    fun engine(
+        db: ru.arzimurotov.hotel.data.local.LocalDatabase,
+        @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
+    ): ru.arzimurotov.hotel.data.local.LocalEngine {
+        // Отдельное пространство Keystore-файлов: старый сеанс backend 0.6.0 сохраняется.
+        val localContext =
+            object : android.content.ContextWrapper(context) {
+                override fun getNoBackupFilesDir() =
+                    java.io.File(context.noBackupFilesDir, "offline09").apply { mkdirs() }
+            }
+        return ru.arzimurotov.hotel.data.local.LocalEngine(
+            db,
+            ru.arzimurotov.hotel.data.SessionStore(localContext),
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun travelRepository(
+        engine: ru.arzimurotov.hotel.data.local.LocalEngine
+    ): ru.arzimurotov.hotel.data.TravelRepository =
+        ru.arzimurotov.hotel.data.local.LocalTravelRepository(engine)
+
+    @Provides
+    @Singleton
+    fun catalogRepository(
+        engine: ru.arzimurotov.hotel.data.local.LocalEngine
+    ): ru.arzimurotov.hotel.domain.CatalogRepository =
+        ru.arzimurotov.hotel.data.local.LocalCatalogRepository(engine)
+
+    @Provides
+    @Singleton
+    fun authRepository(
+        engine: ru.arzimurotov.hotel.data.local.LocalEngine
+    ): ru.arzimurotov.hotel.data.AuthRepository =
+        ru.arzimurotov.hotel.data.local.LocalAuthRepository(engine)
 
     @Provides
     @Singleton
@@ -50,6 +88,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun healthRepository(client: HttpClient, connection: ru.arzimurotov.hotel.data.ApiConnection): HealthRepository =
-        object : HealthRepository { override suspend fun check() = RemoteHealthRepository(client,connection.baseUrl).check() }
+    fun healthRepository(engine: ru.arzimurotov.hotel.data.local.LocalEngine): HealthRepository =
+        object : HealthRepository {
+            override suspend fun check(): ru.arzimurotov.hotel.domain.SystemHealth {
+                engine.ensure()
+                return ru.arzimurotov.hotel.domain.SystemHealth(false, true, "0.9.0")
+            }
+        }
 }

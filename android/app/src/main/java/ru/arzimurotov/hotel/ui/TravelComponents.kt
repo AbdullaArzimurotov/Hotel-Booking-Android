@@ -8,14 +8,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -28,6 +32,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import ru.arzimurotov.hotel.R
 import ru.arzimurotov.hotel.domain.*
 
@@ -55,7 +61,9 @@ fun guestLabel(q: SearchQuery) =
 
 /** Форматирование целых денежных единиц на русском; валюты не конвертируются. */
 fun money(value: Long, currency: String) =
-    NumberFormat.getNumberInstance(Russian).apply { maximumFractionDigits = 2 }.format(java.math.BigDecimal.valueOf(value, 2)) +
+    NumberFormat.getNumberInstance(Russian)
+        .apply { maximumFractionDigits = 2 }
+        .format(java.math.BigDecimal.valueOf(value, 2)) +
         " " +
         when (currency) {
             "RUB" -> "₽"
@@ -229,7 +237,27 @@ fun TravelPhoto(
     photo: Photo,
     modifier: Modifier = Modifier,
     description: String? = "Иллюстрация вымышленной гостиницы",
+    fileName: String? = null,
+    scale: ContentScale = ContentScale.Crop,
 ) {
+    val context = LocalContext.current
+    val bitmap by
+        produceState<android.graphics.Bitmap?>(null, fileName) {
+            value =
+                withContext(Dispatchers.IO) {
+                    fileName
+                        ?.takeIf { Regex("[a-f0-9-]+\\.jpg").matches(it) }
+                        ?.let {
+                            android.graphics.BitmapFactory.decodeFile(
+                                ru.arzimurotov.hotel.data.local.LocalMedia.file(context, it).path
+                            )
+                        }
+                }
+        }
+    if (bitmap != null) {
+        Image(requireNotNull(bitmap).asImageBitmap(), description, modifier, contentScale = scale)
+        return
+    }
     Image(
         painterResource(
             when (photo) {
@@ -240,7 +268,7 @@ fun TravelPhoto(
         ),
         description,
         modifier,
-        contentScale = ContentScale.Crop,
+        contentScale = scale,
     )
 }
 
@@ -301,7 +329,9 @@ fun DemoNote(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable fun DemoNote() = DemoNote("Учебный каталог. Наличие и итоговая цена проверяются сервером для выбранных дат.")
+@Composable
+fun DemoNote() =
+    DemoNote("Учебный каталог. Наличие и итоговая цена проверяются сервером для выбранных дат.")
 
 @Composable
 fun SectionTitle(title: String, subtitle: String? = null) {
@@ -367,7 +397,11 @@ fun HotelCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Box {
-            TravelPhoto(hotel.photos.first(), Modifier.fillMaxWidth().height(178.dp))
+            TravelPhoto(
+                hotel.photos.firstOrNull() ?: Photo.EXTERIOR,
+                Modifier.fillMaxWidth().height(178.dp),
+                fileName = hotel.photoFiles.firstOrNull(),
+            )
             Box(Modifier.align(Alignment.TopEnd).padding(10.dp)) {
                 FavoriteButton(favorite, hotel.id, onFavorite)
             }

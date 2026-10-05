@@ -18,6 +18,10 @@ interface AuthRepository {
     suspend fun update(request: ProfilePatch): UserProfile
     suspend fun summary(): AdminSummary
     suspend fun logout()
+    fun takeRecovery(id:String):String? = null
+    fun acknowledgeRecovery() {}
+    suspend fun changePassword(old:String,new:String):String = throw AuthProblem(ApiError("UNSUPPORTED","Недоступно в серверном режиме."))
+    suspend fun resetPassword(email:String,code:String,new:String):String = throw AuthProblem(ApiError("UNSUPPORTED","Недоступно в серверном режиме."))
 }
 
 /** Token сохраняется только после успешной проверки AuthResponse. 401 защищённого запроса

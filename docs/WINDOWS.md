@@ -160,3 +160,15 @@ btree_gist входит в PostgreSQL; при внешней БД для рас�
 - [Установка PostgreSQL на Windows](https://www.postgresql.org/download/windows/).
 - [Параметры initdb](https://www.postgresql.org/docs/18/app-initdb.html),
   [запуск через pg_ctl](https://www.postgresql.org/docs/18/app-pg-ctl.html).
+# Asus / Windows: актуальная версия 0.9.0
+
+Для самостоятельного APK PostgreSQL не нужен. Клонируйте весь репозиторий,
+откройте `android` в Android Studio, используйте встроенный JBR 25 и API 36,
+выберите `app` → Run. Подробности: [OFFLINE_09.md](OFFLINE_09.md).
+PowerShell: `cd android`, затем `.\gradlew.bat :app:assembleDebug`.
+Первый Sync требует интернет; работа установленного APK — нет.
+Не копируйте Mac `local.properties` на Asus. Базы и аккаунты устройств независимы.
+Release-ключ приватный и в Git отсутствует; без него используйте debug сборку.
+Не удаляйте существующие данные для обновления.
+
+## Архив: установка необязательного backend 0.6.0 на Windows

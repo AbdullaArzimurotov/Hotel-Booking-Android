@@ -1,0 +1,80 @@
+[
+  {
+    "city": "tashkent",
+    "bbox": [
+      41.2991,
+      69.2637,
+      41.323100000000004,
+      69.29570000000001
+    ],
+    "source": "https://api.openstreetmap.org/api/0.6/map?bbox=69.2637,41.2991,69.29570000000001,41.323100000000004",
+    "sha256": "c2864a7281f12e91094224a644a0f0a383a335fcf4eccc7c4e0e9f5e17a1e1e1",
+    "bytes": 430603,
+    "license": "ODbL 1.0, © OpenStreetMap contributors"
+  },
+  {
+    "city": "samarkand",
+    "bbox": [
+      39.6427,
+      66.95899999999999,
+      39.6667,
+      66.991
+    ],
+    "source": "https://api.openstreetmap.org/api/0.6/map?bbox=66.95899999999999,39.6427,66.991,39.6667",
+    "sha256": "3f38b673a42c17e6cfa7cc79581f9672b4d45866c8ed5b18297a670c2f54725c",
+    "bytes": 347536,
+    "license": "ODbL 1.0, © OpenStreetMap contributors"
+  },
+  {
+    "city": "moscow",
+    "bbox": [
+      55.7467,
+      37.6124,
+      55.7557,
+      37.6244
+    ],
+    "source": "https://api.openstreetmap.org/api/0.6/map?bbox=37.6124,55.7467,37.6244,55.7557",
+    "sha256": "ceb4511f76c1951467c5a89fe053d39ddfbf8724d2532060e3105648c6b881de",
+    "bytes": 221800,
+    "license": "ODbL 1.0, © OpenStreetMap contributors"
+  },
+  {
+    "city": "petersburg",
+    "bbox": [
+      59.9353,
+      30.3086,
+      59.9443,
+      30.3206
+    ],
+    "source": "https://api.openstreetmap.org/api/0.6/map?bbox=30.3086,59.9353,30.3206,59.9443",
+    "sha256": "12f2f253e1553ff2ea5494f8020b032791b94803a405c0dae8e59f6d73363acf",
+    "bytes": 73937,
+    "license": "ODbL 1.0, © OpenStreetMap contributors"
+  },
+  {
+    "city": "istanbul",
+    "bbox": [
+      41.0037,
+      28.9724,
+      41.0127,
+      28.9844
+    ],
+    "source": "https://api.openstreetmap.org/api/0.6/map?bbox=28.9724,41.0037,28.9844,41.0127",
+    "sha256": "7b09ce1026155bffad4bd274c03147742a00eca42d1734d9038ec799fb47c133",
+    "bytes": 128972,
+    "license": "ODbL 1.0, © OpenStreetMap contributors"
+  },
+  {
+    "city": "antalya",
+    "bbox": [
+      36.872099999999996,
+      30.689600000000002,
+      36.8961,
+      30.7216
+    ],
+    "source": "https://api.openstreetmap.org/api/0.6/map?bbox=30.689600000000002,36.872099999999996,30.7216,36.8961",
+    "sha256": "fc311df392962420c7311c6f52f941f4b4719cb222f9f96fe50a8b465a4976eb",
+    "bytes": 267193,
+    "license": "ODbL 1.0, © OpenStreetMap contributors"
+  }
+]
