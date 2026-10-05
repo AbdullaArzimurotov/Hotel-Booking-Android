@@ -331,7 +331,7 @@ fun DemoNote(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun DemoNote() =
-    DemoNote("Учебный каталог. Наличие и итоговая цена проверяются сервером для выбранных дат.")
+    DemoNote("Учебный каталог. Наличие и итоговая цена проверяются заново для выбранных дат. Реальные услуги не заказываются.")
 
 @Composable
 fun SectionTitle(title: String, subtitle: String? = null) {

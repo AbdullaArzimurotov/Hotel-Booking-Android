@@ -26,7 +26,8 @@ data class TravelState(
 
 /**
  * Независимые jobs поиска и карточки не блокируют личный кабинет. Отмена coroutine не превращается
- * в сетевую ошибку; повтор кнопки оформления блокируется, идемпотентность обеспечивает сервер.
+ * в ошибку операции; повтор кнопки оформления блокируется, идемпотентность обеспечивает
+ * repository (LocalEngine и Room-транзакция в самостоятельной версии).
  */
 @HiltViewModel
 class TravelViewModel @Inject constructor(private val repository: TravelRepository) : ViewModel() {

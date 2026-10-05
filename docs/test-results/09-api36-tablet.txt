@@ -11,5 +11,3 @@ ru.arzimurotov.hotel.ui.OfflineFlowTest:.
 Time: 139,34
 
 OK (39 tests)
-
-
